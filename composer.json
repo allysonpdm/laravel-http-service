@@ -1,0 +1,43 @@
+{
+    "name": "allysonpdm/laravel-http-service",
+    "description": "Laravel HTTP Service with request logging and rate limiting control",
+    "type": "library",
+    "keywords": ["laravel", "http", "logging", "rate-limiting"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "allysonpdm",
+            "email": "allysonmt@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0",
+        "illuminate/http": "^12.0",
+        "illuminate/database": "^12.0",
+        "illuminate/console": "^12.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0",
+        "orchestra/testbench": "^9.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ThreeRN\\HttpService\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ThreeRN\\HttpService\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ThreeRN\\HttpService\\HttpServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
