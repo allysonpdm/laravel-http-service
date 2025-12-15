@@ -16,6 +16,8 @@ class HttpService
     protected int $defaultBlockTime;
     protected int $timeout;
     protected ?string $forceProtocol;
+    protected array $guzzleOptions = [];
+    protected bool $asFormData = false;
 
     public function __construct()
     {
@@ -102,6 +104,16 @@ class HttpService
         try {
             // Prepara a requisição
             $request = Http::timeout($this->timeout);
+
+            // Adiciona opções do Guzzle (incluindo SSL)
+            if (!empty($this->guzzleOptions)) {
+                $request = $request->withOptions($this->guzzleOptions);
+            }
+
+            // Define formato de envio como formulário
+            if ($this->asFormData) {
+                $request = $request->asForm();
+            }
 
             // Adiciona headers
             if (!empty($headers)) {
@@ -310,6 +322,24 @@ class HttpService
     public function withoutForcedProtocol(): self
     {
         $this->forceProtocol = null;
+        return $this;
+    }
+
+    /**
+     * Define opções personalizadas do Guzzle (ex: configuração SSL)
+     */
+    public function withOptions(array $options): self
+    {
+        $this->guzzleOptions = array_merge($this->guzzleOptions, $options);
+        return $this;
+    }
+
+    /**
+     * Envia dados como formulário (application/x-www-form-urlencoded)
+     */
+    public function asForm(): self
+    {
+        $this->asFormData = true;
         return $this;
     }
 }
