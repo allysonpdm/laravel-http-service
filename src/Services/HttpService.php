@@ -15,6 +15,7 @@ class HttpService
     protected bool $rateLimitEnabled;
     protected int $defaultBlockTime;
     protected int $timeout;
+    protected ?string $forceProtocol;
 
     public function __construct()
     {
@@ -22,6 +23,7 @@ class HttpService
         $this->rateLimitEnabled = config('http-service.rate_limit_enabled', true);
         $this->defaultBlockTime = config('http-service.default_block_time', 15);
         $this->timeout = config('http-service.timeout', 30);
+        $this->forceProtocol = config('http-service.force_protocol', null);
     }
 
     /**
@@ -84,6 +86,9 @@ class HttpService
      */
     protected function request(string $method, string $url, array $options = []): Response
     {
+        // Força o protocolo se configurado
+        $url = $this->applyProtocol($url);
+        
         $domain = $this->extractDomain($url);
         $startTime = microtime(true);
         $payload = $options['data'] ?? $options['query'] ?? [];
@@ -218,6 +223,25 @@ class HttpService
     }
 
     /**
+     * Aplica o protocolo forçado na URL se configurado
+     */
+    protected function applyProtocol(string $url): string
+    {
+        if (empty($this->forceProtocol)) {
+            return $url;
+        }
+
+        // Valida o protocolo
+        $protocol = strtolower($this->forceProtocol);
+        if (!in_array($protocol, ['http', 'https'])) {
+            return $url;
+        }
+
+        // Substitui o protocolo na URL
+        return preg_replace('/^https?:\/\//i', $protocol . '://', $url);
+    }
+
+    /**
      * Desabilita logging temporariamente
      */
     public function withoutLogging(): self
@@ -259,6 +283,33 @@ class HttpService
     public function timeout(int $seconds): self
     {
         $this->timeout = $seconds;
+        return $this;
+    }
+
+    /**
+     * Força o uso de HTTP em todas as requisições
+     */
+    public function forceHttp(): self
+    {
+        $this->forceProtocol = 'http';
+        return $this;
+    }
+
+    /**
+     * Força o uso de HTTPS em todas as requisições
+     */
+    public function forceHttps(): self
+    {
+        $this->forceProtocol = 'https';
+        return $this;
+    }
+
+    /**
+     * Remove o protocolo forçado
+     */
+    public function withoutForcedProtocol(): self
+    {
+        $this->forceProtocol = null;
         return $this;
     }
 }

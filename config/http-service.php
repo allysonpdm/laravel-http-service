@@ -77,4 +77,18 @@ return [
 
     'log_retention_days' => env('HTTP_SERVICE_LOG_RETENTION_DAYS', 30),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Force Protocol
+    |--------------------------------------------------------------------------
+    |
+    | Força o uso de um protocolo específico (http ou https) em todas as URLs.
+    | Quando definido, todas as URLs terão seu protocolo substituído pelo
+    | valor configurado antes de executar as requisições.
+    | Valores aceitos: 'http', 'https', ou null para não forçar.
+    |
+    */
+
+    'force_protocol' => env('HTTP_SERVICE_FORCE_PROTOCOL', null),
+
 ];
