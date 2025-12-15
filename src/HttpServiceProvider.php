@@ -3,6 +3,7 @@
 namespace ThreeRN\HttpService;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\File;
 use ThreeRN\HttpService\Services\HttpService as HttpServiceClass;
 use ThreeRN\HttpService\Console\Commands\InstallCommand;
 use ThreeRN\HttpService\Console\Commands\CleanExpiredBlocksCommand;
@@ -58,8 +59,16 @@ class HttpServiceProvider extends ServiceProvider
             ]);
         }
 
-        // Carrega migrations automaticamente (útil para testes)
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        // Carrega migrations automaticamente somente se ainda não houver
+        // migrations equivalentes publicadas na aplicação.
+        // Isso evita executar duas vezes a mesma criação de tabela
+        // quando o pacote publica as migrations em database/migrations.
+        $existingHttpLog = File::glob(database_path('migrations') . '/*_create_http_request_logs_table.php');
+        $existingRateLimit = File::glob(database_path('migrations') . '/*_create_rate_limit_controls_table.php');
+
+        if (empty($existingHttpLog) && empty($existingRateLimit)) {
+            $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        }
     }
 
     /**

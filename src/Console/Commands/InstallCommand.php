@@ -12,7 +12,7 @@ class InstallCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'http-service:install';
+    protected $signature = 'http-service:install {--force : Overwrite existing files}';
 
     /**
      * The console command description.
@@ -53,16 +53,15 @@ class InstallCommand extends Command
     {
         $configSource = __DIR__ . '/../../../config/http-service.php';
         $configDest = config_path('http-service.php');
+        $force = $this->option('force');
 
-        if (File::exists($configDest)) {
-            if (!$this->confirm('Config file already exists. Overwrite?', false)) {
-                $this->warn('⏭️  Skipped config file');
-                return;
-            }
+        if (File::exists($configDest) && !$force) {
+            $this->warn('Skipped config file: config/http-service.php (already exists)');
+            return;
         }
 
         File::copy($configSource, $configDest);
-        $this->info('✅ Published config file: config/http-service.php');
+        $this->info('Published config file: config/http-service.php');
     }
 
     /**
@@ -92,25 +91,26 @@ class InstallCommand extends Command
             $dest = $migrationsDest . '/' . $time . '_' . $migration;
 
             if (!File::exists($source)) {
-                $this->warn("⚠️  Migration not found: {$migration}");
+                $this->warn("Migration not found: {$migration}");
                 continue;
             }
 
             // Verifica se já existe uma migration semelhante
             $existingMigrations = File::glob($migrationsDest . '/*_' . $migration);
             if (!empty($existingMigrations)) {
-                if (!$this->confirm("Migration {$migration} already exists. Overwrite?", false)) {
-                    $this->warn("⏭️  Skipped migration: {$migration}");
+                if ($this->option('force')) {
+                    // Remove migrations antigas quando for --force
+                    foreach ($existingMigrations as $old) {
+                        File::delete($old);
+                    }
+                } else {
+                    $this->warn("Skipped migration: {$migration} (already exists)");
                     continue;
-                }
-                // Remove migrations antigas
-                foreach ($existingMigrations as $old) {
-                    File::delete($old);
                 }
             }
 
             File::copy($source, $dest);
-            $this->info("✅ Published migration: {$migration}");
+            $this->info("Published migration: {$migration}");
         }
     }
 }

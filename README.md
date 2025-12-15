@@ -19,7 +19,7 @@ Pacote Laravel para gerenciamento avançado de requisições HTTP com logging au
 ### Via Composer
 
 ```bash
-composer require allysonpdm/laravel-http-service
+composer require 3rn/http-service
 ```
 
 ### Configuração Inicial
