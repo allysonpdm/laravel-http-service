@@ -18,6 +18,10 @@ class HttpService
     protected ?string $forceProtocol;
     protected array $guzzleOptions = [];
     protected bool $asFormData = false;
+    protected string $cacheStrategy = 'never'; // never, always, conditional
+    protected int $cacheTtl = 3600; // segundos
+    protected ?int $cacheThreshold = null; // número de chamadas
+    protected ?int $cacheThresholdPeriod = null; // período em segundos
 
     public function __construct()
     {
@@ -26,6 +30,10 @@ class HttpService
         $this->defaultBlockTime = config('http-service.default_block_time', 15);
         $this->timeout = config('http-service.timeout', 30);
         $this->forceProtocol = config('http-service.force_protocol', null);
+        $this->cacheStrategy = config('http-service.cache_strategy', 'never');
+        $this->cacheTtl = config('http-service.cache_ttl', 3600);
+        $this->cacheThreshold = config('http-service.cache_threshold', null);
+        $this->cacheThresholdPeriod = config('http-service.cache_threshold_period', null);
     }
 
     /**
@@ -96,6 +104,14 @@ class HttpService
         $payload = $options['data'] ?? $options['query'] ?? [];
         $headers = $options['headers'] ?? [];
 
+        // Verifica se deve usar cache
+        $cacheKey = $this->generateCacheKey($method, $url, $payload);
+        $shouldUseCache = $this->shouldUseCache($cacheKey);
+        
+        if ($shouldUseCache && $cachedResponse = $this->getCachedResponse($cacheKey)) {
+            return $cachedResponse;
+        }
+
         // Verifica rate limiting
         if ($this->rateLimitEnabled) {
             $this->checkRateLimit($domain);
@@ -140,6 +156,11 @@ class HttpService
             // Registra a requisição
             if ($this->loggingEnabled) {
                 $this->logRequest($url, $method, $payload, $response, $responseTime);
+            }
+
+            // Armazena em cache se aplicável
+            if ($shouldUseCache) {
+                $this->cacheResponse($cacheKey, $response);
             }
 
             return $response;
@@ -341,5 +362,149 @@ class HttpService
     {
         $this->asFormData = true;
         return $this;
+    }
+
+    /**
+     * Sempre usar cache para as requisições
+     */
+    public function withCache(int $ttl = 3600): self
+    {
+        $this->cacheStrategy = 'always';
+        $this->cacheTtl = $ttl;
+        return $this;
+    }
+
+    /**
+     * Nunca usar cache (padrão)
+     */
+    public function withoutCache(): self
+    {
+        $this->cacheStrategy = 'never';
+        return $this;
+    }
+
+    /**
+     * Usar cache apenas se a mesma requisição for chamada X vezes em um período
+     * 
+     * @param int $threshold Número de chamadas necessárias para ativar cache
+     * @param int $period Período em segundos para contar as chamadas
+     * @param int $ttl Tempo de vida do cache em segundos
+     */
+    public function cacheWhen(int $threshold, int $period, int $ttl = 3600): self
+    {
+        $this->cacheStrategy = 'conditional';
+        $this->cacheThreshold = $threshold;
+        $this->cacheThresholdPeriod = $period;
+        $this->cacheTtl = $ttl;
+        return $this;
+    }
+
+    /**
+     * Gera chave única para cache baseada na requisição
+     */
+    protected function generateCacheKey(string $method, string $url, array $payload): string
+    {
+        $data = [
+            'method' => $method,
+            'url' => $url,
+            'payload' => $payload,
+        ];
+        
+        return 'http_service_' . md5(json_encode($data));
+    }
+
+    /**
+     * Verifica se deve usar cache para esta requisição
+     */
+    protected function shouldUseCache(string $cacheKey): bool
+    {
+        if ($this->cacheStrategy === 'never') {
+            return false;
+        }
+
+        if ($this->cacheStrategy === 'always') {
+            return true;
+        }
+
+        if ($this->cacheStrategy === 'conditional') {
+            return $this->shouldUseCacheConditional($cacheKey);
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifica se deve usar cache baseado em frequência de chamadas
+     */
+    protected function shouldUseCacheConditional(string $cacheKey): bool
+    {
+        if (!$this->cacheThreshold || !$this->cacheThresholdPeriod) {
+            return false;
+        }
+
+        $counterKey = $cacheKey . '_counter';
+        $counter = \Illuminate\Support\Facades\Cache::get($counterKey, []);
+        
+        // Remove chamadas antigas fora do período
+        $now = time();
+        $counter = array_filter($counter, function($timestamp) use ($now) {
+            return ($now - $timestamp) <= $this->cacheThresholdPeriod;
+        });
+        
+        // Adiciona nova chamada
+        $counter[] = $now;
+        
+        // Salva contador
+        \Illuminate\Support\Facades\Cache::put(
+            $counterKey, 
+            $counter, 
+            $this->cacheThresholdPeriod
+        );
+        
+        // Verifica se atingiu o threshold
+        return count($counter) >= $this->cacheThreshold;
+    }
+
+    /**
+     * Recupera resposta do cache
+     */
+    protected function getCachedResponse(string $cacheKey): ?Response
+    {
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        
+        if (!$cached) {
+            return null;
+        }
+        
+        // Reconstrói o Response do Laravel
+        return new Response(new \GuzzleHttp\Psr7\Response(
+            $cached['status'],
+            $cached['headers'],
+            $cached['body']
+        ));
+    }
+
+    /**
+     * Armazena resposta no cache
+     */
+    protected function cacheResponse(string $cacheKey, Response $response): void
+    {
+        $cacheData = [
+            'status' => $response->status(),
+            'headers' => $response->headers(),
+            'body' => $response->body(),
+        ];
+        
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $cacheData, $this->cacheTtl);
+    }
+
+    /**
+     * Limpa todo o cache de requisições HTTP
+     */
+    public function clearCache(): void
+    {
+        // Laravel não tem um método nativo para limpar por prefixo
+        // Esta é uma implementação básica
+        \Illuminate\Support\Facades\Cache::flush();
     }
 }

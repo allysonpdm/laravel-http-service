@@ -91,4 +91,61 @@ return [
 
     'force_protocol' => env('HTTP_SERVICE_FORCE_PROTOCOL', null),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Strategy
+    |--------------------------------------------------------------------------
+    |
+    | Define a estratégia padrão de cache para as requisições HTTP.
+    | 
+    | Valores aceitos:
+    | - 'never': Nunca usa cache (padrão)
+    | - 'always': Sempre armazena respostas em cache
+    | - 'conditional': Usa cache apenas quando atingir o threshold de chamadas
+    |
+    */
+
+    'cache_strategy' => env('HTTP_SERVICE_CACHE_STRATEGY', 'never'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache TTL (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | Tempo de vida padrão do cache em segundos.
+    | Este valor será usado quando cache estiver habilitado.
+    | Padrão: 3600 (1 hora)
+    |
+    */
+
+    'cache_ttl' => env('HTTP_SERVICE_CACHE_TTL', 3600),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Threshold
+    |--------------------------------------------------------------------------
+    |
+    | Número de chamadas necessárias para ativar o cache quando a estratégia
+    | for 'conditional'. Se a mesma requisição for feita X vezes dentro do
+    | período definido, o cache será ativado.
+    | Usado apenas quando cache_strategy = 'conditional'.
+    |
+    */
+
+    'cache_threshold' => env('HTTP_SERVICE_CACHE_THRESHOLD', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Threshold Period (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | Período em segundos para contar as chamadas no cache condicional.
+    | Se a mesma requisição for chamada X vezes dentro deste período,
+    | o cache será ativado.
+    | Usado apenas quando cache_strategy = 'conditional'.
+    |
+    */
+
+    'cache_threshold_period' => env('HTTP_SERVICE_CACHE_THRESHOLD_PERIOD', null),
+
 ];
