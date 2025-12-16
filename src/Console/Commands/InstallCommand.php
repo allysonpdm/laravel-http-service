@@ -36,7 +36,7 @@ class InstallCommand extends Command
         $this->publishMigrations();
 
         $this->newLine();
-        $this->info('✅ HTTP Service installed successfully!');
+        $this->info('HTTP Service installed successfully!');
         $this->newLine();
         $this->comment('Next steps:');
         $this->comment('1. Review the config file: config/http-service.php');
@@ -73,7 +73,7 @@ class InstallCommand extends Command
         $migrationsDest = database_path('migrations');
 
         if (!File::isDirectory($migrationsSource)) {
-            $this->error('❌ Migrations source directory not found');
+            $this->error('Migrations source directory not found');
             return;
         }
 

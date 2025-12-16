@@ -27,7 +27,7 @@ class CommandsTest extends TestCase
         RateLimitControl::blockDomain('api.other.com', 30);
 
         $this->artisan('http-service:list-blocks')
-            ->expectsOutput('🚫 Currently blocked domains:')
+            ->expectsOutput('Currently blocked domains:')
             ->assertExitCode(0);
     }
 
@@ -35,7 +35,7 @@ class CommandsTest extends TestCase
     public function list_blocks_command_shows_message_when_no_blocks()
     {
         $this->artisan('http-service:list-blocks')
-            ->expectsOutput('ℹ️  No domains are currently blocked')
+            ->expectsOutput('No domains are currently blocked')
             ->assertExitCode(0);
     }
 
@@ -56,7 +56,7 @@ class CommandsTest extends TestCase
     public function unblock_command_shows_warning_for_non_blocked_domain()
     {
         $this->artisan('http-service:unblock api.example.com')
-            ->expectsOutput("⚠️  Domain 'api.example.com' was not blocked")
+            ->expectsOutput("Domain 'api.example.com' was not blocked")
             ->assertExitCode(0);
     }
 
@@ -80,7 +80,7 @@ class CommandsTest extends TestCase
         ]);
 
         $this->artisan('http-service:clean-blocks')
-            ->expectsOutput('✅ Removed 1 expired block(s)')
+            ->expectsOutput('Removed 1 expired block(s)')
             ->assertExitCode(0);
 
         $this->assertTrue(RateLimitControl::isBlocked('api.active.com'));
@@ -93,7 +93,7 @@ class CommandsTest extends TestCase
         RateLimitControl::blockDomain('api.example.com', 15);
 
         $this->artisan('http-service:clean-blocks')
-            ->expectsOutput('ℹ️  No expired blocks found')
+            ->expectsOutput('No expired blocks found')
             ->assertExitCode(0);
     }
 
@@ -119,7 +119,7 @@ class CommandsTest extends TestCase
         ]);
 
         $this->artisan('http-service:clean-logs')
-            ->expectsOutput('✅ Removed 1 old log(s)')
+            ->expectsOutput('Removed 1 old log(s)')
             ->assertExitCode(0);
 
         $this->assertDatabaseCount('http_request_logs', 1);
@@ -139,7 +139,7 @@ class CommandsTest extends TestCase
         ]);
 
         $this->artisan('http-service:clean-logs --days=7')
-            ->expectsOutput('✅ Removed 1 old log(s)')
+            ->expectsOutput('Removed 1 old log(s)')
             ->assertExitCode(0);
 
         $this->assertDatabaseCount('http_request_logs', 0);

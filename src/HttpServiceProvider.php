@@ -5,6 +5,7 @@ namespace ThreeRN\HttpService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\File;
 use ThreeRN\HttpService\Services\HttpService as HttpServiceClass;
+use ThreeRN\HttpService\Services\HttpBatchService;
 use ThreeRN\HttpService\Console\Commands\InstallCommand;
 use ThreeRN\HttpService\Console\Commands\CleanExpiredBlocksCommand;
 use ThreeRN\HttpService\Console\Commands\UnblockDomainCommand;
@@ -31,6 +32,14 @@ class HttpServiceProvider extends ServiceProvider
 
         // Alias para facilitar injeção de dependência
         $this->app->alias('http-service', HttpServiceClass::class);
+
+        // Registra o serviço de batch
+        $this->app->singleton('http-batch', function ($app) {
+            return new HttpBatchService();
+        });
+
+        // Alias para facilitar injeção de dependência
+        $this->app->alias('http-batch', HttpBatchService::class);
     }
 
     /**
@@ -78,6 +87,11 @@ class HttpServiceProvider extends ServiceProvider
      */
     public function provides(): array
     {
-        return ['http-service', HttpServiceClass::class];
+        return [
+            'http-service',
+            HttpServiceClass::class,
+            'http-batch',
+            HttpBatchService::class,
+        ];
     }
 }

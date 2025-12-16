@@ -31,7 +31,7 @@ class CleanOldLogsCommand extends Command
             ?? config('http-service.log_retention_days', 30);
 
         if ($days === null) {
-            $this->warn('⚠️  Log retention is disabled (log_retention_days is null)');
+            $this->warn('Log retention is disabled (log_retention_days is null)');
             return self::SUCCESS;
         }
 
@@ -41,9 +41,9 @@ class CleanOldLogsCommand extends Command
         $count = HttpRequestLog::where('created_at', '<', $date)->delete();
 
         if ($count > 0) {
-            $this->info("✅ Removed {$count} old log(s)");
+            $this->info("Removed {$count} old log(s)");
         } else {
-            $this->info('ℹ️  No old logs found');
+            $this->info('No old logs found');
         }
 
         return self::SUCCESS;

@@ -31,9 +31,9 @@ class UnblockDomainCommand extends Command
         $this->info("Unblocking domain: {$domain}");
 
         if (RateLimitControl::unblockDomain($domain)) {
-            $this->info("✅ Domain '{$domain}' has been unblocked");
+            $this->info("Domain '{$domain}' has been unblocked");
         } else {
-            $this->warn("⚠️  Domain '{$domain}' was not blocked");
+            $this->warn("Domain '{$domain}' was not blocked");
         }
 
         return self::SUCCESS;

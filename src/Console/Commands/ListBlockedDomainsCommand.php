@@ -29,11 +29,11 @@ class ListBlockedDomainsCommand extends Command
         $blocks = RateLimitControl::active()->get();
 
         if ($blocks->isEmpty()) {
-            $this->info('ℹ️  No domains are currently blocked');
+            $this->info('No domains are currently blocked');
             return self::SUCCESS;
         }
 
-        $this->info('🚫 Currently blocked domains:');
+        $this->info('Currently blocked domains:');
         $this->newLine();
 
         $data = $blocks->map(function ($block) {

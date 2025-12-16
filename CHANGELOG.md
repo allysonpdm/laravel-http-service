@@ -26,14 +26,14 @@ All notable changes to this project will be documented in this file.
 - Laravel 12 compatibility
 
 ### Features
-- ✅ Automatic logging of all HTTP requests (URL, payload, response)
-- ✅ Intelligent rate limiting with 429 error handling
-- ✅ Domain-based blocking system
-- ✅ Automatic retry-after header detection
-- ✅ Query scopes for easy log filtering
-- ✅ Clean expired blocks functionality
-- ✅ Manual domain blocking/unblocking
-- ✅ Configurable via config file and .env
-- ✅ Artisan commands for management
-- ✅ Exception handling for rate limits
-- ✅ Response time tracking
+- Automatic logging of all HTTP requests (URL, payload, response)
+- Intelligent rate limiting with 429 error handling
+- Domain-based blocking system
+- Automatic retry-after header detection
+- Query scopes for easy log filtering
+- Clean expired blocks functionality
+- Manual domain blocking/unblocking
+- Configurable via config file and .env
+- Artisan commands for management
+- Exception handling for rate limits
+- Response time tracking

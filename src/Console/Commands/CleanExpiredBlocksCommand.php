@@ -31,9 +31,9 @@ class CleanExpiredBlocksCommand extends Command
         $count = RateLimitControl::cleanExpiredBlocks();
 
         if ($count > 0) {
-            $this->info("✅ Removed {$count} expired block(s)");
+            $this->info("Removed {$count} expired block(s)");
         } else {
-            $this->info('ℹ️  No expired blocks found');
+            $this->info('No expired blocks found');
         }
 
         return self::SUCCESS;
