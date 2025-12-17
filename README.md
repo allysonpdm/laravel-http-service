@@ -519,8 +519,8 @@ MIT License - veja [LICENSE](LICENSE) para detalhes.
 
 Para dúvidas ou problemas:
 - Abra uma issue no GitHub
-- Email: contato@3rn.com.br
+- Email: allysonmt@gmail.com
 
 ## Créditos
 
-Desenvolvido por 3RN
+Desenvolvido por Allyson P. da Mata
