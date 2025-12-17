@@ -102,6 +102,111 @@ HttpService::withoutLogging()
     ->get($url);
 ```
 
+## Cache de Requisições
+
+O pacote oferece recursos avançados de cache para otimizar requisições repetidas.
+
+### Cache com Expiração Dinâmica
+
+Cache baseado em campos da resposta que contêm informações de expiração:
+
+```php
+// Cache usando campo de data/hora
+// Resposta: {"token": "abc123", "expirationTime": "2025-12-17 13:02:14"}
+$response = HttpService::cacheUsingExpires('expirationTime')
+    ->expiresAsDatetime()  // Padrão, pode ser omitido
+    ->get('https://api.example.com/auth/token');
+
+// Cache usando campo aninhado
+// Resposta: {"data": {"auth": {"expires": "2025-12-17 15:30:00"}}}
+$response = HttpService::cacheUsingExpires('data.auth.expires')
+    ->expiresAsDatetime()
+    ->post('https://api.example.com/login', $credentials);
+
+// Cache usando segundos
+// Resposta: {"token": "xyz789", "expires_in": 3600}
+$response = HttpService::cacheUsingExpires('expires_in')
+    ->expiresAsSeconds()
+    ->get('https://api.example.com/token');
+
+// Cache usando minutos
+// Resposta: {"session_id": "sess_123", "ttl": 30}
+$response = HttpService::cacheUsingExpires('ttl')
+    ->expiresAsMinutes()
+    ->get('https://api.example.com/session');
+```
+
+#### Máscara de Expiração
+
+Defina como interpretar o valor do campo de expiração:
+
+- `expiresAsDatetime()` - Data/hora no formato Y-m-d H:i:s ou ISO 8601 (padrão)
+- `expiresAsSeconds()` - Valor em segundos
+- `expiresAsMinutes()` - Valor em minutos
+
+#### TTL de Fallback
+
+Use um TTL padrão caso o campo não seja encontrado:
+
+```php
+// Se 'expirationTime' não existir, cacheia por 2 horas (7200 segundos)
+$response = HttpService::cacheUsingExpires('expirationTime', 7200)
+    ->expiresAsDatetime()
+    ->get('https://api.example.com/data');
+```
+
+### Cache Fixo
+
+Cache com tempo de vida fixo:
+
+```php
+// Cache por 1 hora (3600 segundos)
+$response = HttpService::withCache(3600)
+    ->get('https://api.example.com/data');
+```
+
+### Cache Condicional
+
+Cache ativado apenas após múltiplas chamadas:
+
+```php
+// Cache após 3 chamadas em 60 segundos, com TTL de 1 hora
+$response = HttpService::cacheWhen(3, 60, 3600)
+    ->get('https://api.example.com/data');
+```
+
+### Desabilitar Cache
+
+```php
+// Desabilitar cache para uma requisição específica
+$response = HttpService::withoutCache()
+    ->get('https://api.example.com/data');
+```
+
+### Limpar Cache
+
+```php
+// Limpar todo o cache de requisições
+HttpService::clearCache();
+```
+
+### Formatos de Data/Hora Suportados
+
+Para `expiresAsDatetime()`:
+- `Y-m-d H:i:s` - Exemplo: "2025-12-17 13:02:14"
+- ISO 8601 - Exemplo: "2025-12-17T13:02:14Z"
+- Qualquer formato aceito pelo construtor DateTime do PHP
+
+### Notação de Ponto para Campos Aninhados
+
+- `'field'` → busca `$response['field']`
+- `'data.auth.expires'` → busca `$response['data']['auth']['expires']`
+- `'user.preferences.cache.ttl'` → busca `$response['user']['preferences']['cache']['ttl']`
+
+### Exemplos Completos
+
+Veja [examples/cache-expires-examples.php](examples/cache-expires-examples.php) para mais exemplos de uso.
+
 ## Rate Limiting
 
 O pacote gerencia automaticamente erros 429 (Too Many Requests):

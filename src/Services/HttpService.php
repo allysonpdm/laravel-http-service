@@ -22,6 +22,8 @@ class HttpService
     protected int $cacheTtl = 3600; // segundos
     protected ?int $cacheThreshold = null; // número de chamadas
     protected ?int $cacheThresholdPeriod = null; // período em segundos
+    protected ?string $cacheExpiresField = null; // campo da resposta com data de expiração
+    protected string $cacheExpiresMask = 'datetime'; // datetime, seconds, minutes
 
     public function __construct()
     {
@@ -495,7 +497,138 @@ class HttpService
             'body' => $response->body(),
         ];
         
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $cacheData, $this->cacheTtl);
+        // Calcula TTL dinâmico se campo de expiração estiver configurado
+        $ttl = $this->cacheTtl;
+        if ($this->cacheExpiresField) {
+            $dynamicTtl = $this->calculateTtlFromResponse($response);
+            if ($dynamicTtl !== null) {
+                $ttl = $dynamicTtl;
+            }
+        }
+        
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $cacheData, $ttl);
+    }
+
+    /**
+     * Define campo da resposta que contém o tempo de expiração do cache
+     * 
+     * @param string $field Caminho do campo na resposta (ex: 'expirationTime', 'data.auth.expires')
+     * @param int|null $fallbackTtl TTL padrão caso o campo não seja encontrado (em segundos)
+     * @return self
+     */
+    public function cacheUsingExpires(string $field, ?int $fallbackTtl = null): self
+    {
+        $this->cacheStrategy = 'always';
+        $this->cacheExpiresField = $field;
+        if ($fallbackTtl !== null) {
+            $this->cacheTtl = $fallbackTtl;
+        }
+        return $this;
+    }
+
+    /**
+     * Define que o campo de expiração contém data/hora (formato Y-m-d H:i:s ou ISO 8601)
+     * 
+     * @return self
+     */
+    public function expiresAsDatetime(): self
+    {
+        $this->cacheExpiresMask = 'datetime';
+        return $this;
+    }
+
+    /**
+     * Define que o campo de expiração contém segundos
+     * 
+     * @return self
+     */
+    public function expiresAsSeconds(): self
+    {
+        $this->cacheExpiresMask = 'seconds';
+        return $this;
+    }
+
+    /**
+     * Define que o campo de expiração contém minutos
+     * 
+     * @return self
+     */
+    public function expiresAsMinutes(): self
+    {
+        $this->cacheExpiresMask = 'minutes';
+        return $this;
+    }
+
+    /**
+     * Calcula o TTL baseado no campo de expiração da resposta
+     * 
+     * @param Response $response
+     * @return int|null TTL em segundos, ou null se não conseguir calcular
+     */
+    protected function calculateTtlFromResponse(Response $response): ?int
+    {
+        $data = $response->json();
+        
+        if (!$data || !$this->cacheExpiresField) {
+            return null;
+        }
+
+        // Extrai o valor do campo usando notação de ponto (ex: 'data.auth.expires')
+        $value = $this->getNestedValue($data, $this->cacheExpiresField);
+        
+        if ($value === null) {
+            return null;
+        }
+
+        // Converte o valor para segundos baseado na máscara
+        return match ($this->cacheExpiresMask) {
+            'seconds' => (int) $value,
+            'minutes' => (int) $value * 60,
+            'datetime' => $this->calculateSecondsUntil($value),
+            default => null,
+        };
+    }
+
+    /**
+     * Obtém valor aninhado de um array usando notação de ponto
+     * 
+     * @param array $array
+     * @param string $key
+     * @return mixed
+     */
+    protected function getNestedValue(array $array, string $key)
+    {
+        $keys = explode('.', $key);
+        
+        foreach ($keys as $k) {
+            if (!is_array($array) || !isset($array[$k])) {
+                return null;
+            }
+            $array = $array[$k];
+        }
+        
+        return $array;
+    }
+
+    /**
+     * Calcula quantos segundos faltam até uma data/hora
+     * 
+     * @param string $datetime Data no formato Y-m-d H:i:s ou ISO 8601
+     * @return int|null Segundos até a data, ou null se inválido
+     */
+    protected function calculateSecondsUntil(string $datetime): ?int
+    {
+        try {
+            $expiresAt = new \DateTime($datetime);
+            $now = new \DateTime();
+            
+            $diff = $expiresAt->getTimestamp() - $now->getTimestamp();
+            
+            // Retorna no mínimo 1 segundo, no máximo o valor calculado
+            return max(1, $diff);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**

@@ -2,10 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0] - 2025-12-15
+## [1.1.0] - 2025-12-17
 
 ### Added
-- Initial release
+- **Cache com Expiração Dinâmica**: Novo método `cacheUsingExpires()` para cachear requisições baseado em campos da resposta
+  - Suporte para campos aninhados usando notação de ponto (ex: `data.auth.expires`)
+  - Múltiplas máscaras de tempo:
+    - `expiresAsDatetime()` - Para campos com data/hora (Y-m-d H:i:s ou ISO 8601)
+    - `expiresAsSeconds()` - Para campos com TTL em segundos
+    - `expiresAsMinutes()` - Para campos com TTL em minutos
+  - TTL de fallback quando o campo não existe na resposta
+  - Cálculo automático de TTL baseado em timestamp de expiração
+- **Novos Métodos Utilitários**:
+  - `calculateTtlFromResponse()` - Calcula TTL dinâmico da resposta
+  - `getNestedValue()` - Extrai valores de arrays aninhados
+  - `calculateSecondsUntil()` - Converte data futura em segundos
+- **Documentação**:
+  - Seção completa sobre cache no README.md
+  - Arquivo de exemplos: `examples/cache-expires-examples.php`
+  - Testes unitários: `tests/Unit/Services/CacheExpiresTest.php`
+
+### Improved
+- Sistema de cache mais flexível com suporte a TTL dinâmico
+- Documentação expandida com exemplos práticos de uso de cache
+
 - HTTP request wrapper with automatic logging
 - Rate limiting control (429 errors) with database storage
 - Models for HttpRequestLog and RateLimitControl
