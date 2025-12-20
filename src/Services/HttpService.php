@@ -100,7 +100,7 @@ class HttpService
     {
         // Força o protocolo se configurado
         $url = $this->applyProtocol($url);
-        
+
         $domain = $this->extractDomain($url);
         $startTime = microtime(true);
         $payload = $options['data'] ?? $options['query'] ?? [];
@@ -109,7 +109,7 @@ class HttpService
         // Verifica se deve usar cache
         $cacheKey = $this->generateCacheKey($method, $url, $payload);
         $shouldUseCache = $this->shouldUseCache($cacheKey);
-        
+
         if ($shouldUseCache && $cachedResponse = $this->getCachedResponse($cacheKey)) {
             return $cachedResponse;
         }
@@ -166,7 +166,6 @@ class HttpService
             }
 
             return $response;
-
         } catch (\Exception $e) {
             $responseTime = microtime(true) - $startTime;
 
@@ -411,7 +410,7 @@ class HttpService
             'url' => $url,
             'payload' => $payload,
         ];
-        
+
         return 'http_service_' . md5(json_encode($data));
     }
 
@@ -446,23 +445,23 @@ class HttpService
 
         $counterKey = $cacheKey . '_counter';
         $counter = \Illuminate\Support\Facades\Cache::get($counterKey, []);
-        
+
         // Remove chamadas antigas fora do período
         $now = time();
-        $counter = array_filter($counter, function($timestamp) use ($now) {
+        $counter = array_filter($counter, function ($timestamp) use ($now) {
             return ($now - $timestamp) <= $this->cacheThresholdPeriod;
         });
-        
+
         // Adiciona nova chamada
         $counter[] = $now;
-        
+
         // Salva contador
         \Illuminate\Support\Facades\Cache::put(
-            $counterKey, 
-            $counter, 
+            $counterKey,
+            $counter,
             $this->cacheThresholdPeriod
         );
-        
+
         // Verifica se atingiu o threshold
         return count($counter) >= $this->cacheThreshold;
     }
@@ -473,11 +472,11 @@ class HttpService
     protected function getCachedResponse(string $cacheKey): ?Response
     {
         $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
-        
+
         if (!$cached) {
             return null;
         }
-        
+
         // Reconstrói o Response do Laravel
         return new Response(new \GuzzleHttp\Psr7\Response(
             $cached['status'],
@@ -496,7 +495,7 @@ class HttpService
             'headers' => $response->headers(),
             'body' => $response->body(),
         ];
-        
+
         // Calcula TTL dinâmico se campo de expiração estiver configurado
         $ttl = $this->cacheTtl;
         if ($this->cacheExpiresField) {
@@ -505,7 +504,7 @@ class HttpService
                 $ttl = $dynamicTtl;
             }
         }
-        
+
         \Illuminate\Support\Facades\Cache::put($cacheKey, $cacheData, $ttl);
     }
 
@@ -518,12 +517,13 @@ class HttpService
      */
     public function cacheUsingExpires(string $field, ?int $fallbackTtl = null): self
     {
-        $this->cacheStrategy = 'always';
-        $this->cacheExpiresField = $field;
+        $clone = clone $this;
+        $clone->cacheStrategy = 'always';
+        $clone->cacheExpiresField = $field;
         if ($fallbackTtl !== null) {
-            $this->cacheTtl = $fallbackTtl;
+            $clone->cacheTtl = $fallbackTtl;
         }
-        return $this;
+        return $clone;
     }
 
     /**
@@ -568,14 +568,14 @@ class HttpService
     protected function calculateTtlFromResponse(Response $response): ?int
     {
         $data = $response->json();
-        
+
         if (!$data || !$this->cacheExpiresField) {
             return null;
         }
 
         // Extrai o valor do campo usando notação de ponto (ex: 'data.auth.expires')
         $value = $this->getNestedValue($data, $this->cacheExpiresField);
-        
+
         if ($value === null) {
             return null;
         }
@@ -599,14 +599,14 @@ class HttpService
     protected function getNestedValue(array $array, string $key)
     {
         $keys = explode('.', $key);
-        
+
         foreach ($keys as $k) {
             if (!is_array($array) || !isset($array[$k])) {
                 return null;
             }
             $array = $array[$k];
         }
-        
+
         return $array;
     }
 
@@ -621,9 +621,9 @@ class HttpService
         try {
             $expiresAt = new \DateTime($datetime);
             $now = new \DateTime();
-            
+
             $diff = $expiresAt->getTimestamp() - $now->getTimestamp();
-            
+
             // Retorna no mínimo 1 segundo, no máximo o valor calculado
             return max(1, $diff);
         } catch (\Exception $e) {
