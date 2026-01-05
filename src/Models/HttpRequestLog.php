@@ -21,6 +21,7 @@ class HttpRequestLog extends Model
     protected $fillable = [
         'url',
         'method',
+        'headers',
         'payload',
         'response',
         'status_code',
@@ -35,6 +36,7 @@ class HttpRequestLog extends Model
      */
     protected $casts = [
         'payload' => 'array',
+        'headers' => 'array',
         'response' => 'array',
         'status_code' => 'integer',
         'response_time' => 'float',

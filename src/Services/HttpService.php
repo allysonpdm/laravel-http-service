@@ -157,7 +157,7 @@ class HttpService
 
             // Registra a requisição
             if ($this->loggingEnabled) {
-                $this->logRequest($url, $method, $payload, $response, $responseTime);
+                $this->logRequest($url, $method, $payload, $response, $responseTime, $headers);
             }
 
             // Armazena em cache se aplicável
@@ -171,7 +171,7 @@ class HttpService
 
             // Registra erro
             if ($this->loggingEnabled) {
-                $this->logError($url, $method, $payload, $e->getMessage(), $responseTime);
+                $this->logError($url, $method, $payload, $e->getMessage(), $responseTime, $headers);
             }
 
             throw $e;
@@ -216,11 +216,13 @@ class HttpService
         string $method,
         array $payload,
         Response $response,
-        float $responseTime
+        float $responseTime,
+        array $headers = []
     ): void {
         HttpRequestLog::create([
             'url' => $url,
             'method' => strtoupper($method),
+            'headers' => $headers,
             'payload' => $payload,
             'response' => $response->json() ?? ['body' => $response->body()],
             'status_code' => $response->status(),
@@ -236,11 +238,13 @@ class HttpService
         string $method,
         array $payload,
         string $errorMessage,
-        float $responseTime
+        float $responseTime,
+        array $headers = []
     ): void {
         HttpRequestLog::create([
             'url' => $url,
             'method' => strtoupper($method),
+            'headers' => $headers,
             'payload' => $payload,
             'error_message' => $errorMessage,
             'response_time' => $responseTime,

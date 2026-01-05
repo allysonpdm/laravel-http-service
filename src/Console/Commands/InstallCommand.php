@@ -81,6 +81,7 @@ class InstallCommand extends Command
         $migrations = [
             'create_http_request_logs_table.php',
             'create_rate_limit_controls_table.php',
+            'add_headers_to_http_request_logs_table.php',
         ];
 
         foreach ($migrations as $index => $migration) {
