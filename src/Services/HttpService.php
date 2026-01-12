@@ -365,8 +365,9 @@ class HttpService
      */
     public function asForm(): self
     {
-        $this->asFormData = true;
-        return $this;
+        $clone = clone $this;
+        $clone->asFormData = true;
+        return $clone;
     }
 
     /**
