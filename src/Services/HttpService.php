@@ -24,6 +24,8 @@ class HttpService
     protected ?int $cacheThresholdPeriod = null; // período em segundos
     protected ?string $cacheExpiresField = null; // campo da resposta com data de expiração
     protected string $cacheExpiresMask = 'datetime'; // datetime, seconds, minutes
+    protected ?array $cacheOnlyStatuses = null;   // array<int> HTTP statuses que SÓ devem ser cacheados
+    protected ?array $cacheExceptStatuses = null; // array<int> HTTP statuses que NÃO devem ser cacheados
 
     public function __construct()
     {
@@ -160,8 +162,19 @@ class HttpService
                 $this->logRequest($url, $method, $payload, $response, $responseTime, $headers);
             }
 
-            // Armazena em cache se aplicável
-            if ($shouldUseCache) {
+            // Decide se deve armazenar em cache usando possíveis filtros por status
+            $shouldCacheResponse = $shouldUseCache;
+
+            if ($shouldUseCache && ($this->cacheOnlyStatuses !== null || $this->cacheExceptStatuses !== null)) {
+                $status = $response->status();
+                if ($this->cacheOnlyStatuses !== null) {
+                    $shouldCacheResponse = in_array($status, $this->cacheOnlyStatuses, true);
+                } elseif ($this->cacheExceptStatuses !== null) {
+                    $shouldCacheResponse = !in_array($status, $this->cacheExceptStatuses, true);
+                }
+            }
+
+            if ($shouldCacheResponse) {
                 $this->cacheResponse($cacheKey, $response);
             }
 
@@ -375,9 +388,10 @@ class HttpService
      */
     public function withCache(int $ttl = 3600): self
     {
-        $this->cacheStrategy = 'always';
-        $this->cacheTtl = $ttl;
-        return $this;
+        $clone = clone $this;
+        $clone->cacheStrategy = 'always';
+        $clone->cacheTtl = $ttl;
+        return $clone;
     }
 
     /**
@@ -391,7 +405,7 @@ class HttpService
 
     /**
      * Usar cache apenas se a mesma requisição for chamada X vezes em um período
-     * 
+     *
      * @param int $threshold Número de chamadas necessárias para ativar cache
      * @param int $period Período em segundos para contar as chamadas
      * @param int $ttl Tempo de vida do cache em segundos
@@ -515,7 +529,7 @@ class HttpService
 
     /**
      * Define campo da resposta que contém o tempo de expiração do cache
-     * 
+     *
      * @param string $field Caminho do campo na resposta (ex: 'expirationTime', 'data.auth.expires')
      * @param int|null $fallbackTtl TTL padrão caso o campo não seja encontrado (em segundos)
      * @return self
@@ -532,8 +546,49 @@ class HttpService
     }
 
     /**
+     * Cachear somente respostas com códigos HTTP informados.
+     * Ex: ->cacheOnly([\Symfony\Component\HttpFoundation\Response::HTTP_OK])
+     */
+    public function cacheOnly(array $statuses, ?int $ttl = null): self
+    {
+        $clone = clone $this;
+        $clone->cacheOnlyStatuses = array_map('intval', array_values($statuses));
+        $clone->cacheExceptStatuses = null;
+        if ($ttl !== null) {
+            $clone->cacheTtl = $ttl;
+        }
+        $clone->cacheStrategy = 'always';
+        return $clone;
+    }
+
+    /**
+     * Cachear todas as respostas, exceto os códigos HTTP informados.
+     */
+    public function cacheExcept(array $statuses, ?int $ttl = null): self
+    {
+        $clone = clone $this;
+        $clone->cacheExceptStatuses = array_map('intval', array_values($statuses));
+        $clone->cacheOnlyStatuses = null;
+        if ($ttl !== null) {
+            $clone->cacheTtl = $ttl;
+        }
+        $clone->cacheStrategy = 'always';
+        return $clone;
+    }
+
+    /**
+     * Limpa filtros de status de cache
+     */
+    public function clearCacheStatusFilters(): self
+    {
+        $this->cacheOnlyStatuses = null;
+        $this->cacheExceptStatuses = null;
+        return $this;
+    }
+
+    /**
      * Define que o campo de expiração contém data/hora (formato Y-m-d H:i:s ou ISO 8601)
-     * 
+     *
      * @return self
      */
     public function expiresAsDatetime(): self
@@ -544,7 +599,7 @@ class HttpService
 
     /**
      * Define que o campo de expiração contém segundos
-     * 
+     *
      * @return self
      */
     public function expiresAsSeconds(): self
@@ -555,7 +610,7 @@ class HttpService
 
     /**
      * Define que o campo de expiração contém minutos
-     * 
+     *
      * @return self
      */
     public function expiresAsMinutes(): self
@@ -566,7 +621,7 @@ class HttpService
 
     /**
      * Calcula o TTL baseado no campo de expiração da resposta
-     * 
+     *
      * @param Response $response
      * @return int|null TTL em segundos, ou null se não conseguir calcular
      */
@@ -596,7 +651,7 @@ class HttpService
 
     /**
      * Obtém valor aninhado de um array usando notação de ponto
-     * 
+     *
      * @param array $array
      * @param string $key
      * @return mixed
@@ -617,7 +672,7 @@ class HttpService
 
     /**
      * Calcula quantos segundos faltam até uma data/hora
-     * 
+     *
      * @param string $datetime Data no formato Y-m-d H:i:s ou ISO 8601
      * @return int|null Segundos até a data, ou null se inválido
      */

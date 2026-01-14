@@ -190,6 +190,51 @@ $response = HttpService::withoutCache()
 HttpService::clearCache();
 ```
 
+### Cache por Status (cacheOnly / cacheExcept)
+
+Você pode controlar o cache com base nos códigos HTTP da resposta usando os métodos `cacheOnly` e `cacheExcept`.
+
+- **`cacheOnly(array $statuses, ?int $ttl = null): self`**
+    - Armazena em cache **apenas** as respostas cujo `status_code` esteja presente em `$statuses`.
+    - Se `$ttl` for passado, ele sobrescreve o TTL para essa requisição específica (em segundos).
+    - Retorna uma cópia (`clone`) do `HttpService`, então a configuração afeta apenas a cadeia encadeada desta chamada.
+
+```php
+// Cachear SOMENTE respostas 200 por 10 minutos
+$response = HttpService::cacheOnly([200], 600)
+        ->get('https://api.example.com/data');
+
+// Cachear respostas 200 e 201 (com TTL customizado)
+$response = HttpService::cacheOnly([200, 201], 300)
+        ->post('https://api.example.com/create', $payload);
+```
+
+- **`cacheExcept(array $statuses, ?int $ttl = null): self`**
+    - Armazena em cache **todas** as respostas exceto aquelas cujo `status_code` esteja em `$statuses`.
+    - Se `$ttl` for passado, ele sobrescreve o TTL para essa requisição específica (em segundos).
+    - Retorna uma cópia (`clone`) do `HttpService`, então a configuração afeta apenas a cadeia encadeada desta chamada.
+
+```php
+// Cachear tudo exceto erro 500
+$response = HttpService::cacheExcept([500])
+        ->get('https://api.example.com/data');
+
+// Cachear tudo exceto 4xx e 5xx (exemplo)
+$response = HttpService::cacheExcept([400,401,403,404,500,502,503], 3600)
+        ->get('https://api.example.com/data');
+```
+
+Observações de implementação:
+
+- Os métodos `cacheOnly` e `cacheExcept` definem `cacheStrategy = 'always'`, portanto ativam o cache para aquela chamada.
+- Os filtros são aplicados somente no momento de armazenamento: o pacote verifica o `status` da resposta e respeita `cacheOnlyStatuses` e `cacheExceptStatuses` antes de persistir no cache.
+- `cacheOnly` limpa `cacheExceptStatuses` e vice-versa; assim, elas não entram em conflito.
+- Se você preferir limpar ambos os filtros manualmente, use `clearCacheStatusFilters()`.
+
+Revisão da implementação
+
+Após revisar `src/Services/HttpService.php`, os métodos `cacheOnly` e `cacheExcept` já estão implementados corretamente e não precisam de alterações funcionais imediatas. Uma sugestão opcional para consistência é que `clearCacheStatusFilters()` poderia retornar um `clone` (como outros métodos que configuram comportamento) para manter o padrão imutável/encadeável, mas isso não é obrigatório.
+
 ### Formatos de Data/Hora Suportados
 
 Para `expiresAsDatetime()`:
