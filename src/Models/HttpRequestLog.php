@@ -45,6 +45,21 @@ class HttpRequestLog extends Model
     ];
 
     /**
+     * Ajusta a conexão do model para a conexão de logging, quando
+     * configurada. Isso garante que chamadas como `HttpRequestLog::create`
+     * usem a conexão separada definida em config/http-service.php.
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        $conn = config('http-service.logging_connection');
+        if (!empty($conn)) {
+            $this->setConnection($conn);
+        }
+    }
+
+    /**
      * Scope para filtrar por URL
      */
     public function scopeByUrl($query, string $url)

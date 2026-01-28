@@ -40,6 +40,24 @@ class RateLimitControl extends Model
     ];
 
     /**
+     * Ajusta a conexão do model para a conexão de logging, quando
+     * configurada. Isso garante que operações como `create`, `delete`
+     * e `where` usem a conexão separada definida em config/http-service.php.
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        // Prefer a conexão específica para rate limit, se informada;
+        // caso contrário, utiliza a conexão de logging (se houver) ou a
+        // conexão padrão do framework.
+        $conn = config('http-service.ratelimit_connection', config('http-service.logging_connection'));
+        if (!empty($conn)) {
+            $this->setConnection($conn);
+        }
+    }
+
+    /**
      * Verifica se o domínio está bloqueado
      */
     public static function isBlocked(string $domain): bool

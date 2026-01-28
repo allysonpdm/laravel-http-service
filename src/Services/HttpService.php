@@ -38,6 +38,7 @@ class HttpService
         $this->cacheTtl = config('http-service.cache_ttl', 3600);
         $this->cacheThreshold = config('http-service.cache_threshold', null);
         $this->cacheThresholdPeriod = config('http-service.cache_threshold_period', null);
+        $this->loggingConnection = config('http-service.logging_connection', null);
     }
 
     /**

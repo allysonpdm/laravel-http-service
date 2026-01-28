@@ -93,6 +93,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Logging DB Connection
+    |--------------------------------------------------------------------------
+    |
+    | Nome da conexão de banco a ser usada exclusivamente para gravação de
+    | logs do HttpService. Defina para o nome de uma conexão em
+    | `config/database.php` (ex: 'logging') para garantir que as escritas
+    | de log não participem de transactions da conexão principal.
+    |
+    */
+    'logging_connection' => env('HTTP_SERVICE_LOGGING_CONNECTION', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | RateLimit DB Connection
+    |--------------------------------------------------------------------------
+    |
+    | Nome da conexão de banco a ser usada para operações relacionadas ao
+    | controle de rate limit (tabela `rate_limit_controls`). Se definido,
+    | `RateLimitControl` usará esta conexão. Se nulo, cairá para
+    | `logging_connection` quando aplicável, ou para a conexão padrão.
+    |
+    */
+    'ratelimit_connection' => env('HTTP_SERVICE_RATELIMIT_CONNECTION', null),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Strategy
     |--------------------------------------------------------------------------
     |
