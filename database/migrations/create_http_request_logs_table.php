@@ -11,7 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('http_request_logs', function (Blueprint $table) {
+        $conn = config('http-service.logging_connection');
+
+        $create = function (Blueprint $table) {
             $table->id();
             $table->string('url', 2048)->index();
             $table->string('method', 10)->index();
@@ -24,7 +26,13 @@ return new class extends Migration
 
             // Índices para otimizar consultas
             $table->index('created_at');
-        });
+        };
+
+        if (!empty($conn)) {
+            Schema::connection($conn)->create('http_request_logs', $create);
+        } else {
+            Schema::create('http_request_logs', $create);
+        }
     }
 
     /**
@@ -32,6 +40,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('http_request_logs');
+        $conn = config('http-service.logging_connection');
+        if (!empty($conn)) {
+            Schema::connection($conn)->dropIfExists('http_request_logs');
+        } else {
+            Schema::dropIfExists('http_request_logs');
+        }
     }
 };

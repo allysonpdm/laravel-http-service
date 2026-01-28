@@ -11,11 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('http_request_logs', function (Blueprint $table) {
-            if (!Schema::hasColumn('http_request_logs', 'headers')) {
-                $table->json('headers')->nullable()->after('payload');
-            }
-        });
+        $conn = config('http-service.logging_connection');
+
+        if (!empty($conn)) {
+            Schema::connection($conn)->table('http_request_logs', function (Blueprint $table) use ($conn) {
+                if (!Schema::connection($conn)->hasColumn('http_request_logs', 'headers')) {
+                    $table->json('headers')->nullable()->after('payload');
+                }
+            });
+        } else {
+            Schema::table('http_request_logs', function (Blueprint $table) {
+                if (!Schema::hasColumn('http_request_logs', 'headers')) {
+                    $table->json('headers')->nullable()->after('payload');
+                }
+            });
+        }
     }
 
     /**
@@ -23,10 +33,20 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('http_request_logs', function (Blueprint $table) {
-            if (Schema::hasColumn('http_request_logs', 'headers')) {
-                $table->dropColumn('headers');
-            }
-        });
+        $conn = config('http-service.logging_connection');
+
+        if (!empty($conn)) {
+            Schema::connection($conn)->table('http_request_logs', function (Blueprint $table) use ($conn) {
+                if (Schema::connection($conn)->hasColumn('http_request_logs', 'headers')) {
+                    $table->dropColumn('headers');
+                }
+            });
+        } else {
+            Schema::table('http_request_logs', function (Blueprint $table) {
+                if (Schema::hasColumn('http_request_logs', 'headers')) {
+                    $table->dropColumn('headers');
+                }
+            });
+        }
     }
 };

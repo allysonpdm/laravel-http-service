@@ -11,14 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('rate_limit_controls', function (Blueprint $table) {
+        $conn = config('http-service.ratelimit_connection', config('http-service.logging_connection'));
+
+        $create = function (Blueprint $table) {
             $table->id();
             $table->string('domain', 255)->unique();
             $table->timestamp('blocked_at');
             $table->integer('wait_time_minutes')->default(15);
             $table->timestamp('unblock_at')->index();
             $table->timestamps();
-        });
+        };
+
+        if (!empty($conn)) {
+            Schema::connection($conn)->create('rate_limit_controls', $create);
+        } else {
+            Schema::create('rate_limit_controls', $create);
+        }
     }
 
     /**
@@ -26,6 +34,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('rate_limit_controls');
+        $conn = config('http-service.ratelimit_connection', config('http-service.logging_connection'));
+        if (!empty($conn)) {
+            Schema::connection($conn)->dropIfExists('rate_limit_controls');
+        } else {
+            Schema::dropIfExists('rate_limit_controls');
+        }
     }
 };
