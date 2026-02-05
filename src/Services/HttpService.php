@@ -224,6 +224,9 @@ class HttpService
 
     /**
      * Registra a requisição no banco de dados
+     *
+     * IMPORTANTE: Usa transação independente para garantir persistência
+     * mesmo em caso de rollback na transação principal da aplicação.
      */
     protected function logRequest(
         string $url,
@@ -233,19 +236,48 @@ class HttpService
         float $responseTime,
         array $headers = []
     ): void {
-        HttpRequestLog::create([
-            'url' => $url,
-            'method' => strtoupper($method),
-            'headers' => $headers,
-            'payload' => $payload,
-            'response' => $response->json() ?? ['body' => $response->body()],
-            'status_code' => $response->status(),
-            'response_time' => $responseTime,
-        ]);
+        // Usar transação independente para garantir que logs sejam salvos
+        // mesmo se houver rollback na transação principal
+        $connection = config('http-service.logging_connection', null);
+
+        try {
+            // Se tem conexão específica, usar ela; senão usa a padrão
+            $db = $connection ? \DB::connection($connection) : \DB::connection();
+
+            // Criar uma nova transação independente
+            $db->transaction(function () use ($url, $method, $payload, $response, $responseTime, $headers, $connection) {
+                $log = new HttpRequestLog([
+                    'url' => $url,
+                    'method' => strtoupper($method),
+                    'headers' => $headers,
+                    'payload' => $payload,
+                    'response' => $response->json() ?? ['body' => $response->body()],
+                    'status_code' => $response->status(),
+                    'response_time' => $responseTime,
+                ]);
+
+                // Garantir que usa a conexão correta
+                if ($connection) {
+                    $log->setConnection($connection);
+                }
+
+                $log->save();
+            });
+        } catch (\Throwable $e) {
+            // Silenciar erros de log para não quebrar o fluxo principal
+            // Você pode adicionar log de erro aqui se necessário
+            \Log::error('HttpService: Erro ao salvar log de requisição', [
+                'error' => $e->getMessage(),
+                'url' => $url,
+            ]);
+        }
     }
 
     /**
      * Registra erro de requisição
+     *
+     * IMPORTANTE: Usa transação independente para garantir persistência
+     * mesmo em caso de rollback na transação principal da aplicação.
      */
     protected function logError(
         string $url,
@@ -255,14 +287,40 @@ class HttpService
         float $responseTime,
         array $headers = []
     ): void {
-        HttpRequestLog::create([
-            'url' => $url,
-            'method' => strtoupper($method),
-            'headers' => $headers,
-            'payload' => $payload,
-            'error_message' => $errorMessage,
-            'response_time' => $responseTime,
-        ]);
+        // Usar transação independente para garantir que logs sejam salvos
+        // mesmo se houver rollback na transação principal
+        $connection = config('http-service.logging_connection', null);
+
+        try {
+            // Se tem conexão específica, usar ela; senão usa a padrão
+            $db = $connection ? \DB::connection($connection) : \DB::connection();
+
+            // Criar uma nova transação independente
+            $db->transaction(function () use ($url, $method, $payload, $errorMessage, $responseTime, $headers, $connection) {
+                $log = new HttpRequestLog([
+                    'url' => $url,
+                    'method' => strtoupper($method),
+                    'headers' => $headers,
+                    'payload' => $payload,
+                    'error_message' => $errorMessage,
+                    'response_time' => $responseTime,
+                ]);
+
+                // Garantir que usa a conexão correta
+                if ($connection) {
+                    $log->setConnection($connection);
+                }
+
+                $log->save();
+            });
+        } catch (\Throwable $e) {
+            // Silenciar erros de log para não quebrar o fluxo principal
+            // Você pode adicionar log de erro aqui se necessário
+            \Log::error('HttpService: Erro ao salvar log de erro', [
+                'error' => $e->getMessage(),
+                'url' => $url,
+            ]);
+        }
     }
 
     /**
