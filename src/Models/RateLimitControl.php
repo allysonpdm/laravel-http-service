@@ -93,6 +93,23 @@ class RateLimitControl extends Model
     }
 
     /**
+     * Obtém o tempo restante de bloqueio em segundos.
+     * Usado pela estratégia waitOnRateLimit para sleep síncrono preciso.
+     */
+    public static function getRemainingBlockSeconds(string $domain): ?int
+    {
+        $control = static::where('domain', $domain)
+            ->where('unblock_at', '>', now())
+            ->first();
+
+        if (!$control) {
+            return null;
+        }
+
+        return (int) now()->diffInSeconds($control->unblock_at);
+    }
+
+    /**
      * Bloqueia um domínio por um determinado tempo
      */
     public static function blockDomain(string $domain, int $waitTimeMinutes): self

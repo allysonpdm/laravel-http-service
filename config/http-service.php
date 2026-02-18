@@ -42,6 +42,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate Limit: Wait on Block (wait-on-rate-limit)
+    |--------------------------------------------------------------------------
+    |
+    | Quando habilitado, ao invés de lançar RateLimitException, o serviço
+    | aguarda de forma síncrona (sleep) até o tempo de bloqueio expirar e
+    | então executa a requisição normalmente.
+    |
+    | Pode ser ativado globalmente aqui ou por chamada via ->waitOnRateLimit().
+    | Para desativar pontualmente use ->throwOnRateLimit().
+    |
+    | ATENÇÃO: Não use em processos web síncronos com bloqueios longos.
+    | Ideal para jobs/queues ou cenários com wait_time_minutes pequeno.
+    |
+    */
+    'rate_limit_wait_on_block' => env('HTTP_SERVICE_RATE_LIMIT_WAIT_ON_BLOCK', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Request Timeout (seconds)
     |--------------------------------------------------------------------------
     |

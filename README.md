@@ -276,6 +276,32 @@ try {
 }
 ```
 
+### Estratégia Wait-on-Rate-Limit
+
+Ao invés de lançar `RateLimitException`, o serviço pode **aguardar de forma síncrona** até o bloqueio expirar e então executar a requisição normalmente.
+
+**Ativar globalmente** via config ou `.env`:
+
+```env
+HTTP_SERVICE_RATE_LIMIT_WAIT_ON_BLOCK=true
+```
+
+**Ativar por chamada** com `waitOnRateLimit()`:
+
+```php
+// Aguarda o bloqueio expirar e então executa
+$response = HttpService::waitOnRateLimit()->get('https://api.example.com/data');
+```
+
+**Desativar pontualmente** (quando estiver ligado globalmente):
+
+```php
+// Lança RateLimitException normalmente, ignorando a config global
+$response = HttpService::throwOnRateLimit()->get('https://api.example.com/data');
+```
+
+> **Atenção:** O processo ficará bloqueado (via `sleep`) pelo tempo exato restante do bloqueio. Não use em requests web síncronos com bloqueios longos. Ideal para jobs/queues ou cenários onde o `default_block_time` é pequeno.
+
 ### Gerenciamento Manual
 
 ```php
@@ -284,11 +310,18 @@ use ThreeRN\HttpService\Models\RateLimitControl;
 // Verificar se está bloqueado
 $isBlocked = RateLimitControl::isBlocked('api.example.com');
 
-// Tempo restante de bloqueio
+// Tempo restante de bloqueio (em minutos)
 $minutes = RateLimitControl::getRemainingBlockTime('api.example.com');
+
+// Tempo restante de bloqueio (em segundos)
+$seconds = RateLimitControl::getRemainingBlockSeconds('api.example.com');
 
 // Bloquear manualmente por 30 minutos
 RateLimitControl::blockDomain('api.example.com', 30);
+
+// Bloquear com motivo registrado
+RateLimitControl::blockDomain('api.example.com', 30);
+// (defina 'reason' via create/update direto no model se necessário)
 
 // Desbloquear manualmente
 RateLimitControl::unblockDomain('api.example.com');
@@ -343,6 +376,16 @@ Cada log contém:
 - `error_message` - Mensagem de erro (se houver)
 - `created_at` / `updated_at` - Timestamps
 
+### Estrutura do Controle de Rate Limit
+
+Cada registro de bloqueio contém:
+- `domain` - Domínio bloqueado
+- `blocked_at` - Momento do bloqueio
+- `wait_time_minutes` - Duração do bloqueio em minutos
+- `unblock_at` - Momento em que o bloqueio expira
+- `reason` - Motivo do bloqueio (opcional, preenchível via `create`/`update`)
+- `created_at` / `updated_at` - Timestamps
+
 ## Comandos Artisan
 
 ### Instalação
@@ -386,6 +429,9 @@ return [
     
     // Tempo de bloqueio padrão após 429 (minutos)
     'default_block_time' => env('HTTP_SERVICE_DEFAULT_BLOCK_TIME', 15),
+
+    // Aguardar o bloqueio expirar em vez de lançar exceção (wait-on-rate-limit)
+    'rate_limit_wait_on_block' => env('HTTP_SERVICE_RATE_LIMIT_WAIT_ON_BLOCK', false),
     
     // Timeout padrão de requisições (segundos)
     'timeout' => env('HTTP_SERVICE_TIMEOUT', 30),
@@ -395,6 +441,18 @@ return [
     
     // Retenção de logs (dias) - null para manter indefinidamente
     'log_retention_days' => env('HTTP_SERVICE_LOG_RETENTION_DAYS', 30),
+
+    // Conexão de banco para gravação de logs (null = conexão padrão)
+    'logging_connection' => env('HTTP_SERVICE_LOGGING_CONNECTION', null),
+
+    // Conexão de banco para rate limiting (null = usa logging_connection ou padrão)
+    'ratelimit_connection' => env('HTTP_SERVICE_RATELIMIT_CONNECTION', null),
+
+    // Nome customizado da tabela de logs (null = 'http_request_logs')
+    'logging_table' => env('HTTP_SERVICE_LOGGING_TABLE', null),
+
+    // Nome customizado da tabela de rate limit (null = 'rate_limit_controls')
+    'ratelimit_table' => env('HTTP_SERVICE_RATELIMIT_TABLE', null),
 ];
 ```
 
@@ -404,10 +462,37 @@ return [
 HTTP_SERVICE_LOGGING_ENABLED=true
 HTTP_SERVICE_RATE_LIMIT_ENABLED=true
 HTTP_SERVICE_DEFAULT_BLOCK_TIME=15
+HTTP_SERVICE_RATE_LIMIT_WAIT_ON_BLOCK=false
 HTTP_SERVICE_TIMEOUT=30
 HTTP_SERVICE_AUTO_CLEAN_EXPIRED=true
 HTTP_SERVICE_LOG_RETENTION_DAYS=30
+HTTP_SERVICE_LOGGING_CONNECTION=
+HTTP_SERVICE_RATELIMIT_CONNECTION=
+HTTP_SERVICE_LOGGING_TABLE=
+HTTP_SERVICE_RATELIMIT_TABLE=
 ```
+
+### Tabelas Customizáveis
+
+Por padrão o pacote usa `http_request_logs` e `rate_limit_controls`. Para usar nomes diferentes sem alterar as migrations:
+
+```env
+HTTP_SERVICE_LOGGING_TABLE=minha_tabela_de_logs
+HTTP_SERVICE_RATELIMIT_TABLE=meu_controle_de_ratelimit
+```
+
+Os models `HttpRequestLog` e `RateLimitControl` aplicam o nome configurado via `setTable()` no construtor.
+
+### Conexões de Banco Separadas
+
+Para isolar logs e rate limiting da conexão principal (útil para garantir persistência mesmo com rollback de transação):
+
+```env
+HTTP_SERVICE_LOGGING_CONNECTION=logging
+HTTP_SERVICE_RATELIMIT_CONNECTION=logging
+```
+
+Se `HTTP_SERVICE_RATELIMIT_CONNECTION` não estiver definido, o pacote usa `HTTP_SERVICE_LOGGING_CONNECTION` como fallback. Se nenhum estiver definido, usa a conexão padrão do Laravel.
 
 ## Exemplos de Uso
 

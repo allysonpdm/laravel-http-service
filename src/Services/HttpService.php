@@ -8,6 +8,7 @@ use Illuminate\Http\Client\PendingRequest;
 use ThreeRN\HttpService\Models\HttpRequestLog;
 use ThreeRN\HttpService\Models\RateLimitControl;
 use ThreeRN\HttpService\Exceptions\RateLimitException;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class HttpService
 {
@@ -26,6 +27,7 @@ class HttpService
     protected string $cacheExpiresMask = 'datetime'; // datetime, seconds, minutes
     protected ?array $cacheOnlyStatuses = null;   // array<int> HTTP statuses que SÓ devem ser cacheados
     protected ?array $cacheExceptStatuses = null; // array<int> HTTP statuses que NÃO devem ser cacheados
+    protected bool $waitOnRateLimit = false;       // aguarda bloqueio expirar em vez de lançar exceção
 
     public function __construct()
     {
@@ -39,6 +41,7 @@ class HttpService
         $this->cacheThreshold = config('http-service.cache_threshold', null);
         $this->cacheThresholdPeriod = config('http-service.cache_threshold_period', null);
         $this->loggingConnection = config('http-service.logging_connection', null);
+        $this->waitOnRateLimit = config('http-service.rate_limit_wait_on_block', false);
     }
 
     /**
@@ -154,7 +157,7 @@ class HttpService
             $responseTime = microtime(true) - $startTime;
 
             // Verifica se recebeu 429 e bloqueia o domínio
-            if ($response->status() === 429 && $this->rateLimitEnabled) {
+            if ($response->status() === HttpResponse::HTTP_TOO_MANY_REQUESTS && $this->rateLimitEnabled) {
                 $this->handleRateLimit($domain, $response);
             }
 
@@ -193,14 +196,29 @@ class HttpService
     }
 
     /**
-     * Verifica se o domínio está bloqueado por rate limiting
+     * Verifica se o domínio está bloqueado por rate limiting.
+     *
+     * Quando $waitOnRateLimit está ativo, aguarda de forma síncrona (sleep)
+     * até o bloqueio expirar e então retorna normalmente, permitindo que
+     * a requisição prossiga. Caso contrário, lança RateLimitException.
      */
     protected function checkRateLimit(string $domain): void
     {
-        if (RateLimitControl::isBlocked($domain)) {
-            $remainingMinutes = RateLimitControl::getRemainingBlockTime($domain);
-            throw new RateLimitException($domain, $remainingMinutes ?? 0);
+        if (!RateLimitControl::isBlocked($domain)) {
+            return;
         }
+
+        if ($this->waitOnRateLimit) {
+            $seconds = RateLimitControl::getRemainingBlockSeconds($domain);
+            if ($seconds !== null && $seconds > 0) {
+                sleep($seconds);
+            }
+            // Após o sleep o bloqueio já expirou — prossegue normalmente
+            return;
+        }
+
+        $remainingMinutes = RateLimitControl::getRemainingBlockTime($domain);
+        throw new RateLimitException($domain, $remainingMinutes ?? 0);
     }
 
     /**
@@ -356,8 +374,9 @@ class HttpService
      */
     public function withoutLogging(): self
     {
-        $this->loggingEnabled = false;
-        return $this;
+        $clone = clone $this;
+        $clone->loggingEnabled = false;
+        return $clone;
     }
 
     /**
@@ -365,8 +384,9 @@ class HttpService
      */
     public function withLogging(): self
     {
-        $this->loggingEnabled = true;
-        return $this;
+        $clone = clone $this;
+        $clone->loggingEnabled = true;
+        return $clone;
     }
 
     /**
@@ -374,8 +394,9 @@ class HttpService
      */
     public function withoutRateLimit(): self
     {
-        $this->rateLimitEnabled = false;
-        return $this;
+        $clone = clone $this;
+        $clone->rateLimitEnabled = false;
+        return $clone;
     }
 
     /**
@@ -383,8 +404,32 @@ class HttpService
      */
     public function withRateLimit(): self
     {
-        $this->rateLimitEnabled = true;
-        return $this;
+        $clone = clone $this;
+        $clone->rateLimitEnabled = true;
+        return $clone;
+    }
+
+    /**
+     * Quando o domínio estiver bloqueado por rate limit, aguarda de forma
+     * síncrona (sleep) até o tempo de bloqueio expirar e então executa
+     * a requisição normalmente, em vez de lançar RateLimitException.
+     */
+    public function waitOnRateLimit(): self
+    {
+        $clone = clone $this;
+        $clone->waitOnRateLimit = true;
+        return $clone;
+    }
+
+    /**
+     * Restaura o comportamento padrão: lança RateLimitException quando
+     * o domínio estiver bloqueado (sem aguardar).
+     */
+    public function throwOnRateLimit(): self
+    {
+        $clone = clone $this;
+        $clone->waitOnRateLimit = false;
+        return $clone;
     }
 
     /**
@@ -392,8 +437,9 @@ class HttpService
      */
     public function timeout(int $seconds): self
     {
-        $this->timeout = $seconds;
-        return $this;
+        $clone = clone $this;
+        $clone->timeout = $seconds;
+        return $clone;
     }
 
     /**
@@ -401,8 +447,9 @@ class HttpService
      */
     public function forceHttp(): self
     {
-        $this->forceProtocol = 'http';
-        return $this;
+        $clone = clone $this;
+        $clone->forceProtocol = 'http';
+        return $clone;
     }
 
     /**
@@ -410,8 +457,9 @@ class HttpService
      */
     public function forceHttps(): self
     {
-        $this->forceProtocol = 'https';
-        return $this;
+        $clone = clone $this;
+        $clone->forceProtocol = 'https';
+        return $clone;
     }
 
     /**
@@ -419,8 +467,9 @@ class HttpService
      */
     public function withoutForcedProtocol(): self
     {
-        $this->forceProtocol = null;
-        return $this;
+        $clone = clone $this;
+        $clone->forceProtocol = null;
+        return $clone;
     }
 
     /**
@@ -428,8 +477,9 @@ class HttpService
      */
     public function withOptions(array $options): self
     {
-        $this->guzzleOptions = array_merge($this->guzzleOptions, $options);
-        return $this;
+        $clone = clone $this;
+        $clone->guzzleOptions = array_merge($this->guzzleOptions, $options);
+        return $clone;
     }
 
     /**
@@ -458,8 +508,9 @@ class HttpService
      */
     public function withoutCache(): self
     {
-        $this->cacheStrategy = 'never';
-        return $this;
+        $clone = clone $this;
+        $clone->cacheStrategy = 'never';
+        return $clone;
     }
 
     /**
@@ -471,11 +522,12 @@ class HttpService
      */
     public function cacheWhen(int $threshold, int $period, int $ttl = 3600): self
     {
-        $this->cacheStrategy = 'conditional';
-        $this->cacheThreshold = $threshold;
-        $this->cacheThresholdPeriod = $period;
-        $this->cacheTtl = $ttl;
-        return $this;
+        $clone = clone $this;
+        $clone->cacheStrategy = 'conditional';
+        $clone->cacheThreshold = $threshold;
+        $clone->cacheThresholdPeriod = $period;
+        $clone->cacheTtl = $ttl;
+        return $clone;
     }
 
     /**
@@ -640,9 +692,10 @@ class HttpService
      */
     public function clearCacheStatusFilters(): self
     {
-        $this->cacheOnlyStatuses = null;
-        $this->cacheExceptStatuses = null;
-        return $this;
+        $clone = clone $this;
+        $clone->cacheOnlyStatuses = null;
+        $clone->cacheExceptStatuses = null;
+        return $clone;
     }
 
     /**
@@ -652,8 +705,9 @@ class HttpService
      */
     public function expiresAsDatetime(): self
     {
-        $this->cacheExpiresMask = 'datetime';
-        return $this;
+        $clone = clone $this;
+        $clone->cacheExpiresMask = 'datetime';
+        return $clone;
     }
 
     /**
@@ -663,8 +717,9 @@ class HttpService
      */
     public function expiresAsSeconds(): self
     {
-        $this->cacheExpiresMask = 'seconds';
-        return $this;
+        $clone = clone $this;
+        $clone->cacheExpiresMask = 'seconds';
+        return $clone;
     }
 
     /**
@@ -674,8 +729,9 @@ class HttpService
      */
     public function expiresAsMinutes(): self
     {
-        $this->cacheExpiresMask = 'minutes';
-        return $this;
+        $clone = clone $this;
+        $clone->cacheExpiresMask = 'minutes';
+        return $clone;
     }
 
     /**
