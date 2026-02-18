@@ -106,6 +106,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Logging Table Name
+    |--------------------------------------------------------------------------
+    |
+    | Nome da tabela utilizada para armazenar os logs de requisições HTTP.
+    | Permite customizar o nome da tabela sem precisar alterar as migrations.
+    | Padrão: 'http_request_logs'.
+    |
+    */
+    'logging_table' => env('HTTP_SERVICE_LOGGING_TABLE', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | RateLimit Table Name
+    |--------------------------------------------------------------------------
+    |
+    | Nome da tabela utilizada para controle de rate limiting.
+    | Permite customizar o nome da tabela sem precisar alterar as migrations.
+    | Padrão: 'rate_limit_controls'.
+    |
+    */
+    'ratelimit_table' => env('HTTP_SERVICE_RATELIMIT_TABLE', null),
+
+    /*
+    |--------------------------------------------------------------------------
     | RateLimit DB Connection
     |--------------------------------------------------------------------------
     |

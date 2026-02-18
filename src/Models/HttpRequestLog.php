@@ -53,6 +53,11 @@ class HttpRequestLog extends Model
     {
         parent::__construct($attributes);
 
+        $table = config('http-service.logging_table');
+        if (!empty($table)) {
+            $this->setTable($table);
+        }
+
         $conn = config('http-service.logging_connection');
         if (!empty($conn)) {
             $this->setConnection($conn);

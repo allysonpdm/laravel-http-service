@@ -24,6 +24,7 @@ class RateLimitControl extends Model
         'blocked_at',
         'wait_time_minutes',
         'unblock_at',
+        'reason',
     ];
 
     /**
@@ -48,10 +49,16 @@ class RateLimitControl extends Model
     {
         parent::__construct($attributes);
 
-        // Prefer a conexão específica para rate limit, se informada;
-        // caso contrário, utiliza a conexão de logging (se houver) ou a
-        // conexão padrão do framework.
-        $conn = config('http-service.ratelimit_connection', config('http-service.logging_connection'));
+        $table = config('http-service.ratelimit_table');
+        if (!empty($table)) {
+            $this->setTable($table);
+        }
+
+        // Bug fix: config() só usa o segundo argumento como default quando a
+        // chave não existe no array de config — não quando o valor é null.
+        // O operador ?? garante o fallback correto para ambos os casos.
+        $conn = config('http-service.ratelimit_connection')
+            ?? config('http-service.logging_connection');
         if (!empty($conn)) {
             $this->setConnection($conn);
         }
