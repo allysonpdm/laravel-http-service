@@ -216,4 +216,53 @@ return [
 
     'cache_threshold_period' => env('HTTP_SERVICE_CACHE_THRESHOLD_PERIOD', null),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Circuit Breaker: Enabled
+    |--------------------------------------------------------------------------
+    |
+    | Habilita o padrão Circuit Breaker globalmente. Quando ativo, o serviço
+    | monitora falhas por domínio e abre o circuito após atingir o threshold,
+    | bloqueando requisições imediatamente (sem nem tentar a conexão) até o
+    | tempo de recuperação expirar.
+    |
+    | Pode ser habilitado por chamada via ->withCircuitBreaker().
+    |
+    */
+    'circuit_breaker_enabled' => env('HTTP_SERVICE_CIRCUIT_BREAKER_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Circuit Breaker: Failure Threshold
+    |--------------------------------------------------------------------------
+    |
+    | Número de falhas consecutivas necessárias para abrir o circuito.
+    | Padrão: 5
+    |
+    */
+    'circuit_breaker_threshold' => env('HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD', 5),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Circuit Breaker: Recovery Time (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | Tempo em segundos que o circuito permanece OPEN antes de passar para
+    | HALF-OPEN e permitir uma requisição de sondagem. Padrão: 60 segundos.
+    |
+    */
+    'circuit_breaker_recovery_time' => env('HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME', 60),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Circuit Breaker: Failure Statuses
+    |--------------------------------------------------------------------------
+    |
+    | Códigos HTTP que contam como falha para o circuit breaker.
+    | Não suporta variável de ambiente (array); configure diretamente aqui.
+    | Padrão: todos os status 5xx (500–599).
+    |
+    */
+    'circuit_breaker_failure_statuses' => range(500, 599),
+
 ];

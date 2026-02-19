@@ -333,6 +333,67 @@ $blocks = RateLimitControl::active()->get();
 $count = RateLimitControl::cleanExpiredBlocks();
 ```
 
+## Circuit Breaker
+
+O circuit breaker é um padrão de resiliência que **abre o circuito** após N falhas consecutivas de um domínio, bloqueando requisições imediatamente (sem nem tentar a conexão) durante um período de recuperação. Diferente do rate limiting (que reage a 429), o circuit breaker é genérico e protege contra qualquer tipo de falha (5xx, timeouts, erros de conexão).
+
+### Estados
+
+| Estado | Comportamento |
+|---|---|
+| **CLOSED** | Operação normal. Falhas são contadas. |
+| **OPEN** | Circuito aberto. Lança `CircuitBreakerException` imediatamente. |
+| **HALF-OPEN** | Após o `recovery_time`, permite uma requisição de sondagem. Se sucesso → CLOSED. Se falha → OPEN. |
+
+### Habilitando Globalmente
+
+Via config ou `.env`:
+
+```env
+HTTP_SERVICE_CIRCUIT_BREAKER_ENABLED=true
+HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD=5
+HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME=60
+```
+
+### Habilitando por Chamada
+
+```php
+// Parâmetros: threshold de falhas, tempo de recuperação em segundos, statuses de falha
+$response = HttpService::withCircuitBreaker(5, 60)
+    ->get('https://api.example.com/data');
+
+// Customizando statuses que contam como falha (padrão: 500-599)
+$response = HttpService::withCircuitBreaker(3, 30, [500, 502, 503, 504])
+    ->post('https://api.example.com/data', $payload);
+
+// Desabilitando pontualmente (quando habilitado globalmente)
+$response = HttpService::withoutCircuitBreaker()
+    ->get('https://api.example.com/health');
+```
+
+### Tratamento de Exceções
+
+```php
+use ThreeRN\HttpService\Exceptions\CircuitBreakerException;
+
+try {
+    $response = HttpService::withCircuitBreaker()->get('https://api.example.com/data');
+} catch (CircuitBreakerException $e) {
+    echo "Circuito aberto para: " . $e->getDomain();
+    echo "Tente novamente em: " . $e->getRemainingSeconds() . " segundos";
+}
+```
+
+### Diferença entre Circuit Breaker e Rate Limiting
+
+| | Rate Limiting | Circuit Breaker |
+|---|---|---|
+| **Aberto por** | Resposta 429 (Too Many Requests) | N falhas consecutivas (5xx, timeout, etc.) |
+| **Protege contra** | Exceder cota da API | Serviço degradado/fora do ar |
+| **Tempo de bloqueio** | Respeitando Retry-After do servidor | Configurável (`recovery_time`) |
+| **Persistência** | Banco de dados | Cache do Laravel |
+| **Sondagem automática** | Não | Sim (HALF-OPEN) |
+
 ## Consultar Logs
 
 ### Models e Query Scopes
@@ -453,6 +514,12 @@ return [
 
     // Nome customizado da tabela de rate limit (null = 'rate_limit_controls')
     'ratelimit_table' => env('HTTP_SERVICE_RATELIMIT_TABLE', null),
+
+    // Circuit Breaker
+    'circuit_breaker_enabled'         => env('HTTP_SERVICE_CIRCUIT_BREAKER_ENABLED', false),
+    'circuit_breaker_threshold'       => env('HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD', 5),
+    'circuit_breaker_recovery_time'   => env('HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME', 60),
+    'circuit_breaker_failure_statuses'=> range(500, 599), // não configurável via env
 ];
 ```
 
@@ -470,6 +537,9 @@ HTTP_SERVICE_LOGGING_CONNECTION=
 HTTP_SERVICE_RATELIMIT_CONNECTION=
 HTTP_SERVICE_LOGGING_TABLE=
 HTTP_SERVICE_RATELIMIT_TABLE=
+HTTP_SERVICE_CIRCUIT_BREAKER_ENABLED=false
+HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD=5
+HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME=60
 ```
 
 ### Tabelas Customizáveis

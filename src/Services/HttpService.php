@@ -8,6 +8,8 @@ use Illuminate\Http\Client\PendingRequest;
 use ThreeRN\HttpService\Models\HttpRequestLog;
 use ThreeRN\HttpService\Models\RateLimitControl;
 use ThreeRN\HttpService\Exceptions\RateLimitException;
+use ThreeRN\HttpService\Exceptions\CircuitBreakerException;
+use ThreeRN\HttpService\Services\CircuitBreakerService;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class HttpService
@@ -28,6 +30,8 @@ class HttpService
     protected ?array $cacheOnlyStatuses = null;   // array<int> HTTP statuses que SÓ devem ser cacheados
     protected ?array $cacheExceptStatuses = null; // array<int> HTTP statuses que NÃO devem ser cacheados
     protected bool $waitOnRateLimit = false;       // aguarda bloqueio expirar em vez de lançar exceção
+    protected bool $circuitBreakerEnabled = false; // habilita circuit breaker por domínio
+    protected ?CircuitBreakerService $circuitBreaker = null;
 
     public function __construct()
     {
@@ -42,6 +46,15 @@ class HttpService
         $this->cacheThresholdPeriod = config('http-service.cache_threshold_period', null);
         $this->loggingConnection = config('http-service.logging_connection', null);
         $this->waitOnRateLimit = config('http-service.rate_limit_wait_on_block', false);
+
+        if (config('http-service.circuit_breaker_enabled', false)) {
+            $this->circuitBreakerEnabled = true;
+            $this->circuitBreaker = new CircuitBreakerService(
+                config('http-service.circuit_breaker_threshold', 5),
+                config('http-service.circuit_breaker_recovery_time', 60),
+                config('http-service.circuit_breaker_failure_statuses', range(500, 599))
+            );
+        }
     }
 
     /**
@@ -125,6 +138,11 @@ class HttpService
             $this->checkRateLimit($domain);
         }
 
+        // Verifica circuit breaker
+        if ($this->circuitBreakerEnabled && $this->circuitBreaker) {
+            $this->circuitBreaker->guardRequest($domain);
+        }
+
         try {
             // Prepara a requisição
             $request = Http::timeout($this->timeout);
@@ -161,6 +179,15 @@ class HttpService
                 $this->handleRateLimit($domain, $response);
             }
 
+            // Notifica o circuit breaker sobre o resultado
+            if ($this->circuitBreakerEnabled && $this->circuitBreaker) {
+                if ($this->circuitBreaker->isFailureStatus($response->status())) {
+                    $this->circuitBreaker->recordFailure($domain);
+                } else {
+                    $this->circuitBreaker->recordSuccess($domain);
+                }
+            }
+
             // Registra a requisição
             if ($this->loggingEnabled) {
                 $this->logRequest($url, $method, $payload, $response, $responseTime, $headers);
@@ -189,6 +216,15 @@ class HttpService
             // Registra erro
             if ($this->loggingEnabled) {
                 $this->logError($url, $method, $payload, $e->getMessage(), $responseTime, $headers);
+            }
+
+            // Notifica o circuit breaker sobre a falha (exceto se for o próprio CB
+            // ou RateLimitException que não indicam falha do serviço remoto)
+            if ($this->circuitBreakerEnabled && $this->circuitBreaker
+                && !($e instanceof CircuitBreakerException)
+                && !($e instanceof RateLimitException)
+            ) {
+                $this->circuitBreaker->recordFailure($domain);
             }
 
             throw $e;
@@ -429,6 +465,39 @@ class HttpService
     {
         $clone = clone $this;
         $clone->waitOnRateLimit = false;
+        return $clone;
+    }
+
+    /**
+     * Habilita o circuit breaker para esta requisição.
+     *
+     * @param int   $failureThreshold  Número de falhas consecutivas para abrir o circuito
+     * @param int   $recoveryTime      Segundos em OPEN antes de tentar HALF-OPEN
+     * @param array $failureStatuses   HTTP statuses que contam como falha (padrão: 500–599)
+     */
+    public function withCircuitBreaker(
+        int $failureThreshold = 5,
+        int $recoveryTime = 60,
+        array $failureStatuses = []
+    ): self {
+        $clone = clone $this;
+        $clone->circuitBreakerEnabled = true;
+        $clone->circuitBreaker = new CircuitBreakerService(
+            $failureThreshold,
+            $recoveryTime,
+            $failureStatuses ?: range(500, 599)
+        );
+        return $clone;
+    }
+
+    /**
+     * Desabilita o circuit breaker para esta requisição.
+     */
+    public function withoutCircuitBreaker(): self
+    {
+        $clone = clone $this;
+        $clone->circuitBreakerEnabled = false;
+        $clone->circuitBreaker = null;
         return $clone;
     }
 
