@@ -52,9 +52,9 @@ class CircuitBreakerService
         ?string $namespace = null
     ) {
         $this->failureThreshold = $failureThreshold;
-        $this->recoveryTime     = $recoveryTime;
-        $this->failureStatuses  = $failureStatuses;
-        $this->namespace        = $namespace;
+        $this->recoveryTime = $recoveryTime;
+        $this->failureStatuses = $failureStatuses;
+        $this->namespace = $namespace;
     }
 
     // -------------------------------------------------------------------------

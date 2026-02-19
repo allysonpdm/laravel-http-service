@@ -255,6 +255,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Circuit Breaker: Wait on Open (wait-on-circuit-breaker)
+    |--------------------------------------------------------------------------
+    |
+    | Quando habilitado, ao invés de lançar CircuitBreakerException, o serviço
+    | aguarda de forma síncrona (sleep) até o tempo de recuperação expirar e
+    | então executa a requisição normalmente (estado HALF-OPEN).
+    |
+    | Pode ser ativado globalmente aqui ou por chamada via ->waitOnCircuitBreaker().
+    | Para desativar pontualmente use ->throwOnCircuitBreaker().
+    |
+    | ATENÇÃO: Não use em processos web síncronos com recovery times longos.
+    | Ideal para jobs/queues ou cenários com circuit_breaker_recovery_time pequeno.
+    |
+    */
+    'circuit_breaker_wait_on_open' => env('HTTP_SERVICE_CIRCUIT_BREAKER_WAIT_ON_OPEN', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Circuit Breaker: Failure Statuses
     |--------------------------------------------------------------------------
     |

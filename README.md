@@ -384,6 +384,31 @@ try {
 }
 ```
 
+### Wait on Circuit Breaker
+
+Por padrão, quando o circuito está OPEN o serviço lança `CircuitBreakerException` imediatamente. Com `waitOnCircuitBreaker()` o comportamento muda: o serviço **aguarda (`sleep`) até o tempo de recuperação expirar** e então tenta a requisição novamente em estado HALF-OPEN — idêntico ao `waitOnRateLimit()` para o rate limiting.
+
+> **Atenção:** não use em processos web síncronos com `recovery_time` longo. Ideal para jobs/queues ou quando o `circuit_breaker_recovery_time` for baixo.
+
+```php
+// Ativa por chamada — aguarda o circuito recuperar e re-tenta
+$response = HttpService::withCircuitBreaker(3, 10)
+    ->waitOnCircuitBreaker()
+    ->get('https://api.example.com/data');
+
+// Desativa pontualmente (quando a config global estiver habilitada)
+$response = HttpService::throwOnCircuitBreaker()
+    ->get('https://api.example.com/data');
+```
+
+**Ativando globalmente** via config ou `.env`:
+
+```env
+HTTP_SERVICE_CIRCUIT_BREAKER_WAIT_ON_OPEN=true
+```
+
+O método `throwOnCircuitBreaker()` permite sobrescrever o comportamento global em chamadas específicas.
+
 ### Diferença entre Circuit Breaker e Rate Limiting
 
 | | Rate Limiting | Circuit Breaker |
@@ -538,6 +563,9 @@ return [
     'circuit_breaker_recovery_time'   => env('HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME', 60),
     'circuit_breaker_failure_statuses'=> range(500, 599), // não configurável via env
     'circuit_breaker_namespace'       => env('HTTP_SERVICE_CB_NAMESPACE', null),
+
+    // Aguardar recuperação do circuito em vez de lançar exceção (wait-on-circuit-breaker)
+    'circuit_breaker_wait_on_open'    => env('HTTP_SERVICE_CIRCUIT_BREAKER_WAIT_ON_OPEN', false),
 ];
 ```
 
@@ -558,6 +586,7 @@ HTTP_SERVICE_RATELIMIT_TABLE=
 HTTP_SERVICE_CIRCUIT_BREAKER_ENABLED=false
 HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD=5
 HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME=60
+HTTP_SERVICE_CIRCUIT_BREAKER_WAIT_ON_OPEN=false
 HTTP_SERVICE_CB_NAMESPACE=
 ```
 

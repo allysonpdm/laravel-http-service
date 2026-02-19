@@ -27,9 +27,11 @@ class HttpService
     protected ?int $cacheThresholdPeriod = null; // período em segundos
     protected ?string $cacheExpiresField = null; // campo da resposta com data de expiração
     protected string $cacheExpiresMask = 'datetime'; // datetime, seconds, minutes
-    protected ?array $cacheOnlyStatuses = null;   // array<int> HTTP statuses que SÓ devem ser cacheados
+    protected ?array $cacheOnlyStatuses = null; // array<int> HTTP statuses que SÓ devem ser cacheados
     protected ?array $cacheExceptStatuses = null; // array<int> HTTP statuses que NÃO devem ser cacheados
-    protected bool $waitOnRateLimit = false;       // aguarda bloqueio expirar em vez de lançar exceção
+    protected bool $waitOnRateLimit = false; // aguarda bloqueio expirar em vez de lançar exceção
+    protected bool $waitOnCircuitBreaker = false;  // aguarda recuperação do CB em vez de lançar exceção
+    protected ?string $loggingConnection = null; // conexão de banco para logs (null = padrão)
     protected bool $circuitBreakerEnabled = false; // habilita circuit breaker por domínio
     protected ?CircuitBreakerService $circuitBreaker = null;
 
@@ -46,6 +48,7 @@ class HttpService
         $this->cacheThresholdPeriod = config('http-service.cache_threshold_period', null);
         $this->loggingConnection = config('http-service.logging_connection', null);
         $this->waitOnRateLimit = config('http-service.rate_limit_wait_on_block', false);
+        $this->waitOnCircuitBreaker = config('http-service.circuit_breaker_wait_on_open', false);
 
         if (config('http-service.circuit_breaker_enabled', false)) {
             $this->circuitBreakerEnabled = true;
@@ -140,9 +143,7 @@ class HttpService
         }
 
         // Verifica circuit breaker
-        if ($this->circuitBreakerEnabled && $this->circuitBreaker) {
-            $this->circuitBreaker->guardRequest($domain);
-        }
+        $this->checkCircuitBreaker($domain);
 
         try {
             // Prepara a requisição
@@ -229,6 +230,41 @@ class HttpService
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * Verifica o estado do circuit breaker para o domínio.
+     *
+     * Quando $waitOnCircuitBreaker está ativo e o circuito está OPEN,
+     * aguarda de forma síncrona (sleep) até o tempo de recuperação expirar
+     * e então re-tenta passar pelo guard (estado HALF-OPEN). Caso contrário,
+     * lança CircuitBreakerException.
+     *
+     * ATENÇÃO: Não use em processos web síncronos com recovery times longos.
+     * Ideal para jobs/queues ou cenários com circuit_breaker_recovery_time pequeno.
+     */
+    protected function checkCircuitBreaker(string $domain): void
+    {
+        if (!$this->circuitBreakerEnabled || !$this->circuitBreaker) {
+            return;
+        }
+
+        try {
+            $this->circuitBreaker->guardRequest($domain);
+        } catch (CircuitBreakerException $e) {
+            if (!$this->waitOnCircuitBreaker) {
+                throw $e;
+            }
+
+            $seconds = $e->getRemainingSeconds();
+            if ($seconds > 0) {
+                sleep($seconds);
+            }
+
+            // Após o sleep o circuito deve estar em HALF-OPEN; tenta novamente.
+            // Se ainda estiver bloqueado (ex.: slot de sondagem ocupado), propaga.
+            $this->circuitBreaker->guardRequest($domain);
         }
     }
 
@@ -466,6 +502,29 @@ class HttpService
     {
         $clone = clone $this;
         $clone->waitOnRateLimit = false;
+        return $clone;
+    }
+
+    /**
+     * Quando o circuito estiver OPEN, aguarda de forma síncrona (sleep) até o
+     * tempo de recuperação expirar e então executa a requisição normalmente,
+     * em vez de lançar CircuitBreakerException.
+     */
+    public function waitOnCircuitBreaker(): self
+    {
+        $clone = clone $this;
+        $clone->waitOnCircuitBreaker = true;
+        return $clone;
+    }
+
+    /**
+     * Restaura o comportamento padrão: lança CircuitBreakerException quando
+     * o circuito estiver aberto (sem aguardar).
+     */
+    public function throwOnCircuitBreaker(): self
+    {
+        $clone = clone $this;
+        $clone->waitOnCircuitBreaker = false;
         return $clone;
     }
 
