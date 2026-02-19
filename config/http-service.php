@@ -132,7 +132,7 @@ return [
     | Padrão: 'http_request_logs'.
     |
     */
-    'logging_table' => env('HTTP_SERVICE_LOGGING_TABLE', null),
+    'logging_table' => env('HTTP_SERVICE_LOGGING_TABLE', 'http_request_logs'),
 
     /*
     |--------------------------------------------------------------------------
@@ -144,7 +144,7 @@ return [
     | Padrão: 'rate_limit_controls'.
     |
     */
-    'ratelimit_table' => env('HTTP_SERVICE_RATELIMIT_TABLE', null),
+    'ratelimit_table' => env('HTTP_SERVICE_RATELIMIT_TABLE', 'rate_limit_controls'),
 
     /*
     |--------------------------------------------------------------------------
