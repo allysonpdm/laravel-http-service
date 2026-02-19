@@ -394,6 +394,23 @@ try {
 | **Persistência** | Banco de dados | Cache do Laravel |
 | **Sondagem automática** | Não | Sim (HALF-OPEN) |
 
+### Namespace Compartilhado entre Projetos
+
+Por padrão, o estado do circuit breaker é **isolado por aplicação** — cada projeto mantém sua própria contagem de falhas. Isso é o comportamento correto na maioria dos casos.
+
+Se dois ou mais projetos usam o **mesmo driver de cache** (ex: mesmo Redis) e precisam compartilhar o estado — para que o App B saiba que o App A já detectou que um domínio está fora do ar — configure o mesmo namespace nos dois:
+
+```env
+# App A e App B — mesmo Redis, mesmo namespace
+HTTP_SERVICE_CB_NAMESPACE=produtivo
+```
+
+Com isso, as chaves de cache ficam no formato `http_cb_produtivo_<md5(domain)>` e são compartilhadas entre os projetos.
+
+Se `HTTP_SERVICE_CB_NAMESPACE` não for definido (padrão), cada app tem seu estado independente com chaves `http_cb_<md5(domain)>`.
+
+> **Atenção:** ao compartilhar namespace, um único projeto sofrendo falhas de rede ou erros locais pode abrir o circuito para todos os outros. Use com cuidado em ambientes heterogêneos.
+
 ## Consultar Logs
 
 ### Models e Query Scopes
@@ -520,6 +537,7 @@ return [
     'circuit_breaker_threshold'       => env('HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD', 5),
     'circuit_breaker_recovery_time'   => env('HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME', 60),
     'circuit_breaker_failure_statuses'=> range(500, 599), // não configurável via env
+    'circuit_breaker_namespace'       => env('HTTP_SERVICE_CB_NAMESPACE', null),
 ];
 ```
 
@@ -540,6 +558,7 @@ HTTP_SERVICE_RATELIMIT_TABLE=
 HTTP_SERVICE_CIRCUIT_BREAKER_ENABLED=false
 HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD=5
 HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME=60
+HTTP_SERVICE_CB_NAMESPACE=
 ```
 
 ### Tabelas Customizáveis

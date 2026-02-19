@@ -265,4 +265,23 @@ return [
     */
     'circuit_breaker_failure_statuses' => range(500, 599),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Circuit Breaker: Namespace Compartilhado
+    |--------------------------------------------------------------------------
+    |
+    | Por padrão o estado do circuit breaker é isolado por aplicação.
+    |
+    | Quando duas ou mais aplicações usam o mesmo cache driver (ex: Redis)
+    | e precisam compartilhar o estado do circuit breaker (para que o App B
+    | saiba que o App A já detectou falhas em um domínio), defina o mesmo
+    | namespace nas duas:
+    |
+    |   HTTP_SERVICE_CB_NAMESPACE=meu-cluster-produtivo
+    |
+    | Deixe nulo para manter o isolamento padrão por aplicação.
+    |
+    */
+    'circuit_breaker_namespace' => env('HTTP_SERVICE_CB_NAMESPACE', null),
+
 ];

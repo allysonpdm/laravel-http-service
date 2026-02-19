@@ -34,11 +34,27 @@ class CircuitBreakerService
     /** TTL do cache de estado (deve ser maior que o maior recoveryTime esperado) */
     protected int $stateCacheTtl = 86400; // 24h
 
-    public function __construct(int $failureThreshold, int $recoveryTime, array $failureStatuses)
-    {
+    /**
+     * Namespace das chaves de cache.
+     *
+     * Quando nulo, as chaves ficam isoladas por instância da aplicação
+     * (comportamento padrão). Quando definido, múltiplos projetos que usam
+     * o mesmo cache driver e o mesmo namespace compartilham o estado do
+     * circuit breaker — útil para evitar que o App A repita erros que o
+     * App B já detectou.
+     */
+    protected ?string $namespace;
+
+    public function __construct(
+        int $failureThreshold,
+        int $recoveryTime,
+        array $failureStatuses,
+        ?string $namespace = null
+    ) {
         $this->failureThreshold = $failureThreshold;
         $this->recoveryTime     = $recoveryTime;
         $this->failureStatuses  = $failureStatuses;
+        $this->namespace        = $namespace;
     }
 
     // -------------------------------------------------------------------------
@@ -215,12 +231,14 @@ class CircuitBreakerService
 
     protected function stateKey(string $domain): string
     {
-        return 'http_cb_' . md5($domain);
+        $prefix = $this->namespace ? 'http_cb_' . $this->namespace . '_' : 'http_cb_';
+        return $prefix . md5($domain);
     }
 
     protected function probeKey(string $domain): string
     {
-        return 'http_cb_probe_' . md5($domain);
+        $prefix = $this->namespace ? 'http_cb_probe_' . $this->namespace . '_' : 'http_cb_probe_';
+        return $prefix . md5($domain);
     }
 
     /**

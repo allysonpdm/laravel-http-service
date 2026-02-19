@@ -52,7 +52,8 @@ class HttpService
             $this->circuitBreaker = new CircuitBreakerService(
                 config('http-service.circuit_breaker_threshold', 5),
                 config('http-service.circuit_breaker_recovery_time', 60),
-                config('http-service.circuit_breaker_failure_statuses', range(500, 599))
+                config('http-service.circuit_breaker_failure_statuses', range(500, 599)),
+                config('http-service.circuit_breaker_namespace', null)
             );
         }
     }
@@ -485,7 +486,8 @@ class HttpService
         $clone->circuitBreaker = new CircuitBreakerService(
             $failureThreshold,
             $recoveryTime,
-            $failureStatuses ?: range(500, 599)
+            $failureStatuses ?: range(500, 599),
+            config('http-service.circuit_breaker_namespace', null)
         );
         return $clone;
     }
