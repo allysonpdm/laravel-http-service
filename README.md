@@ -355,6 +355,20 @@ HTTP_SERVICE_CIRCUIT_BREAKER_THRESHOLD=5
 HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME=60
 ```
 
+### Exemplo: configurando tempos (circuit breaker)
+
+O `HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME` é expresso em **segundos**. Exemplo: aumentar para 120 segundos (2 minutos):
+
+```env
+# Tempo de recuperação do circuit breaker em segundos
+HTTP_SERVICE_CIRCUIT_BREAKER_RECOVERY_TIME=120
+
+# Opcional: aguardar automaticamente até o tempo de recuperação antes de tentar (wait-on-circuit-breaker)
+HTTP_SERVICE_CIRCUIT_BREAKER_WAIT_ON_OPEN=true
+```
+
+Observação: diferentemente do rate limit, que usa minutos para o bloqueio padrão (`default_block_time`), o circuit breaker usa segundos para `recovery_time`.
+
 ### Habilitando por Chamada
 
 ```php
