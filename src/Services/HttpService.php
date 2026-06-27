@@ -2,7 +2,9 @@
 
 namespace ThreeRN\HttpService\Services;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Client\PendingRequest;
 use ThreeRN\HttpService\Models\HttpRequestLog;
@@ -34,6 +36,7 @@ class HttpService
     protected ?string $loggingConnection = null; // conexão de banco para logs (null = padrão)
     protected bool $circuitBreakerEnabled = false; // habilita circuit breaker por domínio
     protected ?CircuitBreakerService $circuitBreaker = null;
+    protected array $rateLimitCache = []; // cache em memória por domínio para evitar queries repetidas
 
     public function __construct()
     {
@@ -139,11 +142,29 @@ class HttpService
 
         // Verifica rate limiting
         if ($this->rateLimitEnabled) {
-            $this->checkRateLimit($domain);
+            try {
+                $this->checkRateLimit($domain);
+            } catch (RateLimitException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                Log::warning('HttpService: falha ao verificar rate limit, prosseguindo sem verificação', [
+                    'domain' => $domain,
+                    'error'  => $e->getMessage(),
+                ]);
+            }
         }
 
         // Verifica circuit breaker
-        $this->checkCircuitBreaker($domain);
+        try {
+            $this->checkCircuitBreaker($domain);
+        } catch (CircuitBreakerException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::warning('HttpService: falha ao verificar circuit breaker, prosseguindo', [
+                'domain' => $domain,
+                'error'  => $e->getMessage(),
+            ]);
+        }
 
         try {
             // Prepara a requisição
@@ -277,7 +298,11 @@ class HttpService
      */
     protected function checkRateLimit(string $domain): void
     {
-        if (!RateLimitControl::isBlocked($domain)) {
+        if (!\array_key_exists($domain, $this->rateLimitCache)) {
+            $this->rateLimitCache[$domain] = RateLimitControl::isBlocked($domain);
+        }
+
+        if (!$this->rateLimitCache[$domain]) {
             return;
         }
 
@@ -310,7 +335,14 @@ class HttpService
             }
         }
 
-        RateLimitControl::blockDomain($domain, $waitTime);
+        try {
+            RateLimitControl::blockDomain($domain, $waitTime);
+        } catch (\Throwable $e) {
+            Log::warning('HttpService: falha ao registrar bloqueio de rate limit', [
+                'domain' => $domain,
+                'error'  => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -333,7 +365,7 @@ class HttpService
 
         try {
             // Se tem conexão específica, usar ela; senão usa a padrão
-            $db = $connection ? \DB::connection($connection) : \DB::connection();
+            $db = $connection ? DB::connection($connection) : DB::connection();
 
             // Criar uma nova transação independente
             $db->transaction(function () use ($url, $method, $payload, $response, $responseTime, $headers, $connection) {
@@ -357,7 +389,7 @@ class HttpService
         } catch (\Throwable $e) {
             // Silenciar erros de log para não quebrar o fluxo principal
             // Você pode adicionar log de erro aqui se necessário
-            \Log::error('HttpService: Erro ao salvar log de requisição', [
+            Log::error('HttpService: Erro ao salvar log de requisição', [
                 'error' => $e->getMessage(),
                 'url' => $url,
             ]);
@@ -384,7 +416,7 @@ class HttpService
 
         try {
             // Se tem conexão específica, usar ela; senão usa a padrão
-            $db = $connection ? \DB::connection($connection) : \DB::connection();
+            $db = $connection ? DB::connection($connection) : DB::connection();
 
             // Criar uma nova transação independente
             $db->transaction(function () use ($url, $method, $payload, $errorMessage, $responseTime, $headers, $connection) {
@@ -407,7 +439,7 @@ class HttpService
         } catch (\Throwable $e) {
             // Silenciar erros de log para não quebrar o fluxo principal
             // Você pode adicionar log de erro aqui se necessário
-            \Log::error('HttpService: Erro ao salvar log de erro', [
+            Log::error('HttpService: Erro ao salvar log de erro', [
                 'error' => $e->getMessage(),
                 'url' => $url,
             ]);
